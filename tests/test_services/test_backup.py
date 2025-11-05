@@ -1,6 +1,7 @@
 """
 Tests for compressy.services.backup module.
 """
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

@@ -1,6 +1,7 @@
 """
 Tests for compressy.core.ffmpeg_executor module.
 """
+
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch

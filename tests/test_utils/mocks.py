@@ -1,6 +1,7 @@
 """
 Reusable mock objects for testing.
 """
+
 import subprocess
 from subprocess import CompletedProcess
 from unittest.mock import MagicMock, Mock

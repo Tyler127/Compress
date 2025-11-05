@@ -1,6 +1,7 @@
 """
 Integration tests for end-to-end workflows.
 """
+
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch

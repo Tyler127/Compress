@@ -1,6 +1,7 @@
 """
 Tests for compressy.utils.format module.
 """
+
 import pytest
 
 from compressy.utils.format import format_size

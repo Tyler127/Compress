@@ -1,6 +1,7 @@
 """
 Tests for compressy.services.statistics module.
 """
+
 import csv
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch

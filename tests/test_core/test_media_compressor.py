@@ -1,6 +1,7 @@
 """
 Tests for compressy.core.media_compressor module.
 """
+
 import os
 import shutil
 from pathlib import Path

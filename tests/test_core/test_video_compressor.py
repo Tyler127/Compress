@@ -1,6 +1,7 @@
 """
 Tests for compressy.core.video_compressor module.
 """
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
