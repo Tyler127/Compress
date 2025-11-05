@@ -119,6 +119,19 @@ class StatisticsTracker:
             self.stats["folder_stats"][folder_key]["total_files"] += 1
             self.stats["folder_stats"][folder_key]["total_original_size"] += original_size
     
+    def add_total_file_size(self, original_size: int, folder_key: str = "root") -> None:
+        """Add file size to total (but don't increment global total_files counter).
+        
+        Note: In recursive mode, this DOES increment folder-level total_files
+        to ensure per-folder reports are generated correctly.
+        """
+        self.stats["total_original_size"] += original_size
+        
+        if self.recursive:
+            self.initialize_folder_stats(folder_key)
+            self.stats["folder_stats"][folder_key]["total_files"] += 1
+            self.stats["folder_stats"][folder_key]["total_original_size"] += original_size
+    
     def set_total_processing_time(self, total_time: float) -> None:
         """Set total processing time."""
         self.stats["total_processing_time"] = total_time

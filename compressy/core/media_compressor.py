@@ -75,12 +75,14 @@ class MediaCompressor:
         if not self.config.overwrite:
             compressed_folder.mkdir(parents=True, exist_ok=True)
         
-        self.stats.stats["total_files"] = len(all_files)
-        print(f"Found {len(all_files)} media file(s) to process...")
+        total_files_count = len(all_files)
+        # Set total_files once - this represents all files found upfront
+        self.stats.stats["total_files"] = total_files_count
+        print(f"Found {total_files_count} media file(s) to process...")
         
         # Process each file
         for idx, file_path in enumerate(all_files, 1):
-            self._process_file(file_path, idx, len(all_files), compressed_folder)
+            self._process_file(file_path, idx, total_files_count, compressed_folder)
         
         # Set total processing time
         total_processing_time = time.time() - start_time
@@ -147,8 +149,8 @@ class MediaCompressor:
         folder_key = self._get_folder_key(file_path)
         original_size = in_path.stat().st_size
         
-        # Add to total files
-        self.stats.add_total_file(original_size, folder_key)
+        # Add to total original size (but not total_files count - that's set once upfront)
+        self.stats.add_total_file_size(original_size, folder_key)
         
         # Skip if already compressed and not overwriting
         if not self.config.overwrite and out_path.exists():
