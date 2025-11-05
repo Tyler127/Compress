@@ -2,18 +2,19 @@
 Shared pytest fixtures and configuration.
 """
 import os
-import tempfile
 import shutil
+
+# Suppress print statements during tests
+import sys
+import tempfile
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, Mock
+
 import pytest
 
 from compressy.core.config import CompressionConfig
 from compressy.core.ffmpeg_executor import FFmpegExecutor
-
-# Suppress print statements during tests
-import sys
-from io import StringIO
 
 
 @pytest.fixture
@@ -76,7 +77,7 @@ def mock_config(temp_dir):
         progress_interval=1.0,
         keep_if_larger=False,
         backup_dir=None,
-        preserve_format=False
+        preserve_format=False,
     )
 
 
@@ -99,9 +100,9 @@ def mock_statistics():
                 "space_saved": 250000,
                 "compression_ratio": 50.0,
                 "processing_time": 1.5,
-                "status": "success"
+                "status": "success",
             }
-        ]
+        ],
     }
 
 
@@ -109,12 +110,12 @@ def mock_statistics():
 def cleanup_temp_files():
     """Fixture to clean up temporary files after tests."""
     temp_paths = []
-    
+
     def add_temp_path(path):
         temp_paths.append(path)
-    
+
     yield add_temp_path
-    
+
     # Cleanup
     for path in temp_paths:
         if isinstance(path, Path) and path.exists():
@@ -122,4 +123,3 @@ def cleanup_temp_files():
                 path.unlink()
             elif path.is_dir():
                 shutil.rmtree(path)
-
