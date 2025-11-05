@@ -7,7 +7,6 @@ import re
 import time
 from pathlib import Path
 from datetime import datetime
-from PIL import Image
 from typing import Optional, Dict, List, Tuple
 
 
@@ -178,13 +177,16 @@ def run_ffmpeg_with_progress(
     return result
 
 
-def validate_parameters(video_crf: int, image_quality: int, video_preset: str) -> None:
+def validate_parameters(video_crf: int, image_quality: int, video_preset: str, image_resize: Optional[int] = None) -> None:
     """Validate input parameters."""
     if not (0 <= video_crf <= 51):
         raise ValueError(f"video_crf must be between 0 and 51, got {video_crf}")
     
     if not (0 <= image_quality <= 100):
         raise ValueError(f"image_quality must be between 0 and 100, got {image_quality}")
+    
+    if image_resize is not None and not (1 <= image_resize <= 100):
+        raise ValueError(f"image_resize must be between 1 and 100, got {image_resize}")
     
     valid_presets = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", 
                      "slow", "slower", "veryslow"]
@@ -229,6 +231,7 @@ def compress_media(
     video_crf: int = 23,
     video_preset: str = "medium",
     image_quality: int = 85,
+    image_resize: Optional[int] = None,
     recursive: bool = False,
     overwrite: bool = False,
     ffmpeg_path: Optional[str] = None,
@@ -244,7 +247,7 @@ def compress_media(
         If recursive=True, includes per-folder stats in 'folder_stats' key.
     """
     # Validate parameters
-    validate_parameters(video_crf, image_quality, video_preset)
+    validate_parameters(video_crf, image_quality, video_preset, image_resize)
     
     # Find FFmpeg if not provided
     if ffmpeg_path is None:
@@ -394,25 +397,99 @@ def compress_media(
                     progress_interval=progress_interval,
                     filename=f.name
                 )
+                # Track if timestamps were already preserved
+                preserve_timestamps_called = False
             elif f.suffix.lower() in image_exts:
-                # Use Pillow to compress
-                img = Image.open(in_path)
+                # Use FFmpeg to compress images
                 # Preserve original format
-                format_map = {
-                    ".jpg": "JPEG",
-                    ".jpeg": "JPEG",
-                    ".png": "PNG",
-                    ".webp": "WEBP"
-                }
-                img_format = format_map.get(f.suffix.lower(), "JPEG")
                 
-                if img_format == "PNG":
-                    img.save(out_path, format=img_format, optimize=True)
+                # Track if timestamps were already preserved
+                preserve_timestamps_called = False
+                
+                # Determine output format based on input format
+                input_ext = f.suffix.lower()
+                if input_ext in ['.jpg', '.jpeg']:
+                    # JPEG quality mapping
+                    # Map image_quality (0-100) to JPEG quality (0-100)
+                    # JPEG quality 100 is essentially uncompressed and produces huge files
+                    # Map quality 100 to JPEG quality 95 (excellent quality, much smaller files)
+                    if image_quality >= 100:
+                        jpeg_quality = 95
+                    elif image_quality >= 95:
+                        jpeg_quality = image_quality - 5
+                    else:
+                        jpeg_quality = int((image_quality / 94) * 90)
+                        jpeg_quality = max(1, min(90, jpeg_quality))
+                    
+                    # FFmpeg uses q:v scale: 2=best quality, 31=worst quality
+                    ffmpeg_q = int(2 + (31 - 2) * (100 - jpeg_quality) / 100)
+                    ffmpeg_q = max(2, min(31, ffmpeg_q))
+                    
+                    # Build FFmpeg arguments for JPEG compression
+                    ffmpeg_args = [
+                        "-i", str(in_path),
+                        "-q:v", str(ffmpeg_q),
+                    ]
+                elif input_ext == '.png':
+                    # PNG compression - use compress_level (0-9)
+                    # Map image_quality (0-100) to compress_level (0-9)
+                    # Higher quality = lower compression level (better quality, larger file)
+                    compress_level = int(9 - (image_quality / 100) * 9)
+                    compress_level = max(0, min(9, compress_level))
+                    
+                    # Build FFmpeg arguments for PNG compression
+                    ffmpeg_args = [
+                        "-i", str(in_path),
+                        "-compression_level", str(compress_level),
+                    ]
+                elif input_ext == '.webp':
+                    # WebP quality mapping
+                    # Map image_quality (0-100) to WebP quality (0-100)
+                    if image_quality >= 100:
+                        webp_quality = 95
+                    elif image_quality >= 95:
+                        webp_quality = image_quality - 5
+                    else:
+                        webp_quality = int((image_quality / 94) * 90)
+                        webp_quality = max(1, min(90, webp_quality))
+                    
+                    # Build FFmpeg arguments for WebP compression
+                    ffmpeg_args = [
+                        "-i", str(in_path),
+                        "-quality", str(webp_quality),
+                    ]
                 else:
-                    img.save(out_path, format=img_format, quality=image_quality, optimize=True)
+                    # Default: use quality parameter for other formats
+                    ffmpeg_args = [
+                        "-i", str(in_path),
+                        "-q:v", str(int(2 + (31 - 2) * (100 - image_quality) / 100)) if image_quality <= 100 else "2",
+                    ]
+                
+                # Add resize filter if specified
+                if image_resize is not None and image_resize < 100:
+                    # Resize image: resize percentage (e.g., 90 = 90% of original dimensions)
+                    resize_factor = image_resize / 100
+                    ffmpeg_args.extend([
+                        "-vf", f"scale=iw*{resize_factor}:ih*{resize_factor}:flags=lanczos"
+                    ])
+                
+                # Add output arguments (preserve original format)
+                ffmpeg_args.extend([
+                    "-y",  # Overwrite output file if it exists
+                    str(out_path)
+                ])
+                
+                # Run FFmpeg for image compression
+                run_ffmpeg_with_progress(
+                    ffmpeg_path,
+                    ffmpeg_args,
+                    progress_interval=progress_interval,
+                    filename=f.name
+                )
             
-            # Preserve timestamps
-            preserve_timestamps(in_path, out_path)
+            # Preserve timestamps (unless already done by shutil.copy2 for quality 100)
+            if not preserve_timestamps_called:
+                preserve_timestamps(in_path, out_path)
             
             # Get compressed size
             compressed_size = out_path.stat().st_size
@@ -686,6 +763,8 @@ def generate_report(stats: Dict, compressed_folder_name: str, output_dir: Path, 
                 writer.writerow(["# Video CRF", cmd_args.get('video_crf', 'N/A')])
                 writer.writerow(["# Video Preset", cmd_args.get('video_preset', 'N/A')])
                 writer.writerow(["# Image Quality", cmd_args.get('image_quality', 'N/A')])
+                if cmd_args.get('image_resize'):
+                    writer.writerow(["# Image Resize", f"{cmd_args.get('image_resize')}%"])
                 writer.writerow(["# Recursive", cmd_args.get('recursive', 'N/A')])
                 writer.writerow(["# Overwrite", cmd_args.get('overwrite', 'N/A')])
                 writer.writerow(["# Keep If Larger", cmd_args.get('keep_if_larger', 'N/A')])
@@ -789,8 +868,14 @@ def main():
     parser.add_argument(
         "--image-quality",
         type=int,
-        default=85,
-        help="Image quality (0-100, higher = better quality, default: 85)"
+        default=100,
+        help="Image quality (0-100, higher = better quality, default: 100)"
+    )
+    parser.add_argument(
+        "--image-resize",
+        type=int,
+        default=None,
+        help="Resize images to percentage of original dimensions (1-100, e.g., 90 = 90%% of original size, default: no resize)"
     )
     parser.add_argument(
         "-r", "--recursive",
@@ -834,6 +919,7 @@ def main():
             video_crf=args.video_crf,
             video_preset=args.video_preset,
             image_quality=args.image_quality,
+            image_resize=args.image_resize,
             recursive=args.recursive,
             overwrite=args.overwrite,
             ffmpeg_path=args.ffmpeg_path,
@@ -852,6 +938,7 @@ def main():
             'video_crf': args.video_crf,
             'video_preset': args.video_preset,
             'image_quality': args.image_quality,
+            'image_resize': args.image_resize,
             'recursive': args.recursive,
             'overwrite': args.overwrite,
             'keep_if_larger': args.keep_if_larger,
