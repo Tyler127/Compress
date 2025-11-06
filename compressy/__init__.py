@@ -14,7 +14,7 @@ from compressy.services.backup import BackupManager
 from compressy.services.reports import ReportGenerator
 from compressy.services.statistics import StatisticsManager, StatisticsTracker
 from compressy.utils.file_processor import FileProcessor
-from compressy.utils.format import format_size
+from compressy.utils.format import format_size, parse_size, parse_resolution
 
 
 __all__ = [
@@ -30,4 +30,6 @@ __all__ = [
     "BackupManager",
     "FileProcessor",
     "format_size",
+    "parse_size",
+    "parse_resolution",
 ]

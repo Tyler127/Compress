@@ -198,11 +198,20 @@ def main():
             'overwrite': args.overwrite,
             'keep_if_larger': args.keep_if_larger,
             'progress_interval': args.progress_interval,
+            'preserve_format': args.preserve_format,
         }
         if args.ffmpeg_path:
             cmd_args['ffmpeg_path'] = args.ffmpeg_path
         if args.backup_dir:
             cmd_args['backup_dir'] = args.backup_dir
+        if args.min_size:
+            cmd_args['min_size'] = args.min_size
+        if args.max_size:
+            cmd_args['max_size'] = args.max_size
+        if args.output_dir:
+            cmd_args['output_dir'] = args.output_dir
+        if args.video_resolution:
+            cmd_args['video_resolution'] = args.video_resolution
         
         report_generator = ReportGenerator(Path.cwd())
         report_paths = report_generator.generate(stats, compressed_folder_name, recursive=args.recursive, cmd_args=cmd_args)
