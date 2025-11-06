@@ -39,8 +39,11 @@ A powerful Python command-line tool for compressing videos and images using FFmp
 ## ✨ Features
 
 - **🎥 Video Compression**: Compress videos using H.264 codec with customizable CRF and encoding presets
+- **📐 Video Resolution Control**: Scale videos to target resolutions (720p, 1080p, 4k, or custom dimensions)
 - **🖼️ Image Compression**: Compress images (JPEG, PNG, WebP) with quality control and resizing options
 - **📁 Batch Processing**: Process entire folders recursively with support for nested directories
+- **📏 File Size Filtering**: Filter files by minimum/maximum size before processing
+- **📂 Custom Output Directory**: Save compressed files to a custom location instead of the default 'compressed' folder
 - **🔄 Format Conversion**: Converts all images to JPEG for maximum compression (unless `--preserve-format` is used)
 - **📊 Statistics Tracking**: Track compression statistics across multiple runs with cumulative totals
 - **📈 Detailed Reports**: Generate CSV reports with per-file compression details
@@ -125,8 +128,14 @@ python compressy.py /path/to/videos --video-preset slow
 # Resize videos to 90% of original dimensions
 python compressy.py /path/to/videos --video-resize 90
 
-# Combine quality and resize for smaller file sizes
-python compressy.py /path/to/videos --video-crf 24 --video-resize 75
+# Scale videos to specific resolution (720p, 1080p, 1440p, 2160p, 4k, 8k)
+python compressy.py /path/to/videos --video-resolution 1080p
+
+# Scale videos to custom resolution (WIDTHxHEIGHT)
+python compressy.py /path/to/videos --video-resolution 1920x1080
+
+# Combine quality, resolution, and resize for smaller file sizes
+python compressy.py /path/to/videos --video-crf 24 --video-resolution 720p
 ```
 
 **Video CRF Values:**
@@ -168,6 +177,18 @@ python compressy.py /path/to/media --keep-if-larger
 
 # Adjust progress update interval (seconds)
 python compressy.py /path/to/media --progress-interval 2.0
+
+# Output compressed files to custom directory (instead of default 'compressed' folder)
+python compressy.py /path/to/media --output-dir /path/to/output
+
+# Process only files within a size range (supports B, KB, MB, GB, TB)
+python compressy.py /path/to/media --min-size 1MB --max-size 100MB
+
+# Process only large files (over 10MB)
+python compressy.py /path/to/media --min-size 10MB
+
+# Process only small files (under 50MB)
+python compressy.py /path/to/media --max-size 50MB
 ```
 
 ### Viewing Statistics
@@ -191,11 +212,15 @@ python compressy.py --view-history 5
 | `--video-crf` | Video CRF value (0-51, lower = higher quality) | 23 |
 | `--video-preset` | Video encoding preset | medium |
 | `--video-resize` | Resize videos to % of original (0-100, 0 = no resize) | None |
+| `--video-resolution` | Target video resolution (e.g., '1920x1080', '720p', '1080p', '4k') | None |
 | `--image-quality` | Image quality (0-100, higher = better) | 100 |
 | `--image-resize` | Resize images to % of original (1-100) | None |
 | `-r, --recursive` | Process files recursively | False |
 | `--overwrite` | Overwrite original files | False |
 | `--preserve-format` | Preserve original image formats | False |
+| `--min-size` | Minimum file size to process (e.g., '1MB', '500KB', '1.5GB') | None |
+| `--max-size` | Maximum file size to process (e.g., '100MB', '1GB', '2.5GB') | None |
+| `--output-dir` | Custom output directory for compressed files (cannot be used with --overwrite) | None |
 | `--ffmpeg-path` | Custom path to FFmpeg executable | Auto-detect |
 | `--progress-interval` | Seconds between progress updates | 5.0 |
 | `--keep-if-larger` | Keep files even if compression makes them larger | False |
@@ -243,7 +268,10 @@ python compressy.py ~/Pictures/Photos --recursive --image-quality 85 --image-res
 # Compress videos with good quality for web distribution
 python compressy.py ~/Videos --recursive --video-crf 24 --video-preset fast
 
-# Compress and resize videos to 720p equivalent (smaller file sizes)
+# Compress and scale videos to 720p for web (smaller file sizes)
+python compressy.py ~/Videos --recursive --video-crf 24 --video-resolution 720p
+
+# Alternative: Compress and resize videos to 75% of original dimensions
 python compressy.py ~/Videos --recursive --video-crf 24 --video-resize 75
 ```
 
@@ -259,6 +287,36 @@ python compressy.py ~/Media --backup-dir ~/Backups/Media --overwrite --recursive
 ```bash
 # Compress images but keep original formats (PNG, WebP, etc.)
 python compressy.py ~/Images --preserve-format --image-quality 90
+```
+
+### Example 5: Scale videos to 720p for web
+
+```bash
+# Compress and scale all videos to 720p resolution
+python compressy.py ~/Videos --recursive --video-resolution 720p --video-crf 24
+
+# Scale 4K videos down to 1080p with high quality
+python compressy.py ~/Videos/4K --video-resolution 1080p --video-crf 20
+```
+
+### Example 6: Process only large files
+
+```bash
+# Compress only files larger than 50MB
+python compressy.py ~/Media --recursive --min-size 50MB
+
+# Compress files between 10MB and 500MB
+python compressy.py ~/Media --recursive --min-size 10MB --max-size 500MB
+```
+
+### Example 7: Custom output directory
+
+```bash
+# Save compressed files to a custom directory instead of 'compressed' folder
+python compressy.py ~/Media --recursive --output-dir ~/CompressedMedia
+
+# Combine with other options for complete workflow
+python compressy.py ~/Videos --recursive --output-dir ~/Web/Videos --video-resolution 720p --video-crf 24
 ```
 
 ## 🏗️ Project Structure
@@ -333,6 +391,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **File sizes**: Some files may not compress well (already compressed media, very small files)
 - **Processing time**: Large videos may take significant time to process
 - **FFmpeg required**: This tool requires FFmpeg to be installed and accessible
+- **Output directory**: When using `--output-dir`, compressed files are saved to the custom directory. Cannot be combined with `--overwrite`
+- **Video resolution**: The `--video-resolution` option scales videos to the specified resolution. Use standard presets (720p, 1080p, 4k) or custom dimensions (WIDTHxHEIGHT)
+- **File size filtering**: `--min-size` and `--max-size` filter files before processing. Useful for targeting specific file size ranges
 
 ## 🐛 Troubleshooting
 
