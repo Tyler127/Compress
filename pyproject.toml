@@ -40,3 +40,19 @@ warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 
+[tool.coverage.run]
+source = ["compressy", "."]
+include = ["compressy/*", "compressy.py"]
+omit = ["tests/*", "*/tests/*", "*/test_*.py", "*/__pycache__/*", "*/htmlcov/*", "*/site-packages/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
