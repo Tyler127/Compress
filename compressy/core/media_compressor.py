@@ -42,8 +42,10 @@ class MediaCompressor:
         # File extension lists
         self.video_exts = [".mp4", ".mov", ".mkv", ".avi"]
         self.image_exts = [".jpg", ".jpeg", ".png", ".webp"]
-        
-        self.logger.debug(f"MediaCompressor initialized with config: video_crf={config.video_crf}, image_quality={config.image_quality}, recursive={config.recursive}")
+
+        self.logger.debug(
+            f"MediaCompressor initialized with config: video_crf={config.video_crf}, image_quality={config.image_quality}, recursive={config.recursive}"
+        )
 
     def compress(self) -> Dict:
         """
@@ -82,7 +84,7 @@ class MediaCompressor:
             compressed_folder = self.config.output_dir
         else:
             compressed_folder = self.config.source_folder / "compressed"
-        
+
         if not self.config.overwrite:
             compressed_folder.mkdir(parents=True, exist_ok=True)
             self.logger.debug(f"Created compressed folder: {compressed_folder}")
@@ -117,29 +119,29 @@ class MediaCompressor:
                 for f in self.config.source_folder.iterdir()
                 if f.suffix.lower() in self.video_exts + self.image_exts and f.is_file()
             ]
-        
+
         # Apply size filters if specified
         if self.config.min_size is not None or self.config.max_size is not None:
             filtered_files = []
             for f in files:
                 try:
                     file_size = f.stat().st_size
-                    
+
                     # Check min_size
                     if self.config.min_size is not None and file_size < self.config.min_size:
                         continue
-                    
+
                     # Check max_size
                     if self.config.max_size is not None and file_size > self.config.max_size:
                         continue
-                    
+
                     filtered_files.append(f)
                 except (OSError, FileNotFoundError):
                     # Skip files that can't be accessed
                     continue
-            
+
             return filtered_files
-        
+
         return files
 
     def _get_folder_key(self, file_path: Path) -> str:
@@ -230,7 +232,9 @@ class MediaCompressor:
             # Check if compressed file is larger than original
             if compressed_size > original_size:
                 if self.config.keep_if_larger:
-                    self.logger.warning(f"Compressed file is larger than original: {file_path.name} ({format_size(compressed_size)} > {format_size(original_size)})")
+                    self.logger.warning(
+                        f"Compressed file is larger than original: {file_path.name} ({format_size(compressed_size)} > {format_size(original_size)})"
+                    )
                     print(
                         f"  ⚠️  Warning: Compressed file is larger than original ({format_size(compressed_size)} > {format_size(original_size)})"
                     )
@@ -299,7 +303,9 @@ class MediaCompressor:
 
             # Print result
             if compression_ratio < 0:
-                self.logger.warning(f"Compression increased file size: {file_path.name} ({compression_ratio:.1f}% increase)")
+                self.logger.warning(
+                    f"Compression increased file size: {file_path.name} ({compression_ratio:.1f}% increase)"
+                )
                 print(
                     f"  ⚠️  Compressed (larger): {format_size(original_size)} → {format_size(compressed_size)} "
                     f"({compression_ratio:.1f}% increase)"
@@ -315,7 +321,7 @@ class MediaCompressor:
             self.logger.error(
                 f"FFmpeg error processing file: {in_path.name}",
                 exc_info=True,
-                extra={"file_path": str(in_path), "return_code": e.returncode}
+                extra={"file_path": str(in_path), "return_code": e.returncode},
             )
             print(f"  ✗ Error processing {in_path.name}: FFmpeg error")
             file_processing_time = time.time() - file_start_time
@@ -342,7 +348,7 @@ class MediaCompressor:
             self.logger.error(
                 f"Error processing file: {in_path.name}",
                 exc_info=True,
-                extra={"file_path": str(in_path), "error_type": type(e).__name__}
+                extra={"file_path": str(in_path), "error_type": type(e).__name__},
             )
             print(f"  ✗ Error processing {in_path.name}: {e}")
             file_processing_time = time.time() - file_start_time

@@ -66,11 +66,7 @@ def test_logger_configuration_basic():
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
         logger.configure(
-            log_level="DEBUG",
-            log_dir=tmpdir,
-            enable_console=True,
-            enable_file=True,
-            rotation_enabled=False
+            log_level="DEBUG", log_dir=tmpdir, enable_console=True, enable_file=True, rotation_enabled=False
         )
 
         assert logger._log_dir == Path(tmpdir)
@@ -82,12 +78,7 @@ def test_logger_configuration_console_only():
     """Test logger with console output only."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="INFO",
-            log_dir=tmpdir,
-            enable_console=True,
-            enable_file=False
-        )
+        logger.configure(log_level="INFO", log_dir=tmpdir, enable_console=True, enable_file=False)
 
         assert logger._console_handler is not None
         assert logger._file_handler is None
@@ -97,12 +88,7 @@ def test_logger_configuration_file_only():
     """Test logger with file output only."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="INFO",
-            log_dir=tmpdir,
-            enable_console=False,
-            enable_file=True
-        )
+        logger.configure(log_level="INFO", log_dir=tmpdir, enable_console=False, enable_file=True)
 
         assert logger._console_handler is None
         assert logger._file_handler is not None
@@ -131,10 +117,11 @@ def test_logger_rotation_size_based():
             rotation_enabled=True,
             rotation_type="size",
             max_bytes=1024,
-            backup_count=3
+            backup_count=3,
         )
 
         from logging.handlers import RotatingFileHandler
+
         assert isinstance(logger._file_handler, RotatingFileHandler)
         assert logger._file_handler.maxBytes == 1024
         assert logger._file_handler.backupCount == 3
@@ -151,10 +138,11 @@ def test_logger_rotation_time_based():
             rotation_enabled=True,
             rotation_type="time",
             when="H",
-            backup_count=5
+            backup_count=5,
         )
 
         from logging.handlers import TimedRotatingFileHandler
+
         assert isinstance(logger._file_handler, TimedRotatingFileHandler)
         assert logger._file_handler.backupCount == 5
 
@@ -165,11 +153,7 @@ def test_logger_rotation_invalid_type():
         logger = CompressyLogger()
         with pytest.raises(ValueError, match="Invalid rotation_type"):
             logger.configure(
-                log_level="INFO",
-                log_dir=tmpdir,
-                enable_file=True,
-                rotation_enabled=True,
-                rotation_type="invalid"
+                log_level="INFO", log_dir=tmpdir, enable_file=True, rotation_enabled=True, rotation_type="invalid"
             )
 
 
@@ -182,12 +166,7 @@ def test_all_severity_levels():
     """Test all RFC 5424 severity levels."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="DEBUG",
-            log_dir=tmpdir,
-            enable_console=False,
-            enable_file=True
-        )
+        logger.configure(log_level="DEBUG", log_dir=tmpdir, enable_console=False, enable_file=True)
 
         # Test all severity levels
         logger.emergency("Emergency message")
@@ -226,10 +205,7 @@ def test_log_level_filtering():
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
         logger.configure(
-            log_level="WARNING",  # Only WARNING and above
-            log_dir=tmpdir,
-            enable_console=False,
-            enable_file=True
+            log_level="WARNING", log_dir=tmpdir, enable_console=False, enable_file=True  # Only WARNING and above
         )
 
         logger.debug("Debug message")
@@ -256,15 +232,9 @@ def test_log_level_filtering():
 
 def test_detailed_formatter_includes_location():
     """Test that DetailedFormatter includes location information."""
-    formatter = DetailedFormatter(fmt='%(asctime)s [%(levelname)s] [%(location)s] %(message)s')
+    formatter = DetailedFormatter(fmt="%(asctime)s [%(levelname)s] [%(location)s] %(message)s")
     record = logging.LogRecord(
-        name="test",
-        level=logging.INFO,
-        pathname="test_file.py",
-        lineno=42,
-        msg="Test message",
-        args=(),
-        exc_info=None
+        name="test", level=logging.INFO, pathname="test_file.py", lineno=42, msg="Test message", args=(), exc_info=None
     )
     record.module = "test_module"
     record.funcName = "test_function"
@@ -276,15 +246,9 @@ def test_detailed_formatter_includes_location():
 
 def test_simple_formatter_no_location():
     """Test that SimpleFormatter doesn't include location."""
-    formatter = SimpleFormatter(fmt='%(message)s')
+    formatter = SimpleFormatter(fmt="%(message)s")
     record = logging.LogRecord(
-        name="test",
-        level=logging.INFO,
-        pathname="test_file.py",
-        lineno=42,
-        msg="Test message",
-        args=(),
-        exc_info=None
+        name="test", level=logging.INFO, pathname="test_file.py", lineno=42, msg="Test message", args=(), exc_info=None
     )
 
     formatted = formatter.format(record)
@@ -315,12 +279,7 @@ def test_log_file_content():
     """Test that log messages are written to file correctly."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="DEBUG",
-            log_dir=tmpdir,
-            enable_console=False,
-            enable_file=True
-        )
+        logger.configure(log_level="DEBUG", log_dir=tmpdir, enable_console=False, enable_file=True)
 
         test_message = "Unique test message 12345"
         logger.info(test_message)
@@ -336,12 +295,7 @@ def test_traceback_logging():
     """Test that exceptions with tracebacks are logged correctly."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="ERROR",
-            log_dir=tmpdir,
-            enable_console=False,
-            enable_file=True
-        )
+        logger.configure(log_level="ERROR", log_dir=tmpdir, enable_console=False, enable_file=True)
 
         try:
             raise ValueError("Test exception")
@@ -365,12 +319,7 @@ def test_console_shows_info_and_above(capsys):
     """Test that console only shows INFO level and above."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="DEBUG",
-            log_dir=tmpdir,
-            enable_console=True,
-            enable_file=False
-        )
+        logger.configure(log_level="DEBUG", log_dir=tmpdir, enable_console=True, enable_file=False)
 
         logger.debug("Debug message")
         logger.info("Info message")
@@ -388,12 +337,7 @@ def test_file_captures_all_levels():
     """Test that file captures all configured levels."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = CompressyLogger()
-        logger.configure(
-            log_level="DEBUG",
-            log_dir=tmpdir,
-            enable_console=False,
-            enable_file=True
-        )
+        logger.configure(log_level="DEBUG", log_dir=tmpdir, enable_console=False, enable_file=True)
 
         logger.debug("Debug message")
         logger.info("Info message")
@@ -438,7 +382,7 @@ def test_logger_with_unicode_messages():
         logger.info(unicode_message)
 
         log_files = list(Path(tmpdir).glob("*.log"))
-        log_content = log_files[0].read_text(encoding='utf-8')
+        log_content = log_files[0].read_text(encoding="utf-8")
 
         assert unicode_message in log_content
 
@@ -464,4 +408,3 @@ def test_get_underlying_logger():
 
     assert isinstance(underlying, logging.Logger)
     assert underlying.name == "compressy"
-

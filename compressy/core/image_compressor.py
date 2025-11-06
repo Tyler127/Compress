@@ -25,7 +25,9 @@ class ImageCompressor:
         self.ffmpeg = ffmpeg_executor
         self.config = config
         self.logger = get_logger()
-        self.logger.debug(f"ImageCompressor initialized: quality={config.image_quality}, resize={config.image_resize}, preserve_format={config.preserve_format}")
+        self.logger.debug(
+            f"ImageCompressor initialized: quality={config.image_quality}, resize={config.image_resize}, preserve_format={config.preserve_format}"
+        )
 
     def compress(self, in_path: Path, out_path: Path) -> None:
         """

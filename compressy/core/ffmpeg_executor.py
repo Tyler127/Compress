@@ -172,7 +172,7 @@ class FFmpegExecutor:
         if result.returncode != 0:
             self.logger.error(
                 f"FFmpeg command failed for {filename} with return code {result.returncode}",
-                extra={"return_code": result.returncode, "stderr": stderr[:500]}  # Log first 500 chars of stderr
+                extra={"return_code": result.returncode, "stderr": stderr[:500]},  # Log first 500 chars of stderr
             )
             raise subprocess.CalledProcessError(result.returncode, cmd, stdout, stderr)
 

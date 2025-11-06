@@ -443,7 +443,9 @@ class StatisticsManager:
         cumulative["format_stats_json"] = json.dumps(cumulative_format_stats)
         cumulative["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        self.logger.debug(f"Updated cumulative statistics: total_runs={cumulative['total_runs']}, total_files_processed={cumulative['total_files_processed']}")
+        self.logger.debug(
+            f"Updated cumulative statistics: total_runs={cumulative['total_runs']}, total_files_processed={cumulative['total_files_processed']}"
+        )
         self.save_cumulative_stats(cumulative)
 
     def save_cumulative_stats(self, stats: Dict) -> None:

@@ -44,7 +44,7 @@ class LoggingConfig:
             rotation_type=rotation_config.get("type", "size"),
             max_bytes=rotation_config.get("max_bytes", 10485760),
             backup_count=rotation_config.get("backup_count", 5),
-            when=rotation_config.get("when", "midnight")
+            when=rotation_config.get("when", "midnight"),
         )
 
     @classmethod
@@ -69,11 +69,7 @@ class LoggingConfig:
             print(f"Warning: Could not load logging config from {config_path}: {e}")
             return cls()  # Return default configuration
 
-    def merge_with_cli_args(
-        self,
-        log_level: Optional[str] = None,
-        log_dir: Optional[str] = None
-    ) -> "LoggingConfig":
+    def merge_with_cli_args(self, log_level: Optional[str] = None, log_dir: Optional[str] = None) -> "LoggingConfig":
         """
         Merge configuration with CLI arguments. CLI args take precedence.
 
@@ -93,7 +89,7 @@ class LoggingConfig:
             rotation_type=self.rotation_type,
             max_bytes=self.max_bytes,
             backup_count=self.backup_count,
-            when=self.when
+            when=self.when,
         )
 
 
@@ -204,9 +200,10 @@ class ParameterValidator:
         """Validate video resolution format."""
         if video_resolution is None:
             return
-        
+
         # Import parse_resolution to validate
         from compressy.utils.format import parse_resolution
+
         try:
             parse_resolution(video_resolution)
         except ValueError as e:

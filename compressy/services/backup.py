@@ -27,7 +27,7 @@ class BackupManager:
         """
         logger = get_logger()
         logger.info(f"Starting backup creation for: {source_folder}")
-        
+
         backup_dir.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Backup directory created/verified: {backup_dir}")
 
@@ -51,5 +51,9 @@ class BackupManager:
             print(f"✓ Backup created successfully: {backup_path}")
             return backup_path
         except Exception as e:
-            logger.error(f"Failed to create backup", exc_info=True, extra={"source": str(source_folder), "backup_path": str(backup_path)})
+            logger.error(
+                f"Failed to create backup",
+                exc_info=True,
+                extra={"source": str(source_folder), "backup_path": str(backup_path)},
+            )
             raise
