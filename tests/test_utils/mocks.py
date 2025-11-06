@@ -4,6 +4,7 @@ Reusable mock objects for testing.
 
 import subprocess
 from subprocess import CompletedProcess
+from typing import Dict, List
 from unittest.mock import MagicMock, Mock
 
 
