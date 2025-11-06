@@ -2,8 +2,6 @@
 Tests for compressy.core.config module.
 """
 
-from pathlib import Path
-
 import pytest
 
 from compressy.core.config import CompressionConfig, ParameterValidator

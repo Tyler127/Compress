@@ -44,7 +44,8 @@ class MediaCompressor:
         self.image_exts = [".jpg", ".jpeg", ".png", ".webp"]
 
         self.logger.debug(
-            f"MediaCompressor initialized with config: video_crf={config.video_crf}, image_quality={config.image_quality}, recursive={config.recursive}"
+            f"MediaCompressor initialized with config: video_crf={config.video_crf}, "
+            f"image_quality={config.image_quality}, recursive={config.recursive}"
         )
 
     def compress(self) -> Dict:
@@ -233,10 +234,12 @@ class MediaCompressor:
             if compressed_size > original_size:
                 if self.config.keep_if_larger:
                     self.logger.warning(
-                        f"Compressed file is larger than original: {file_path.name} ({format_size(compressed_size)} > {format_size(original_size)})"
+                        f"Compressed file is larger than original: {file_path.name} "
+                        f"({format_size(compressed_size)} > {format_size(original_size)})"
                     )
                     print(
-                        f"  ⚠️  Warning: Compressed file is larger than original ({format_size(compressed_size)} > {format_size(original_size)})"
+                        f"  ⚠️  Warning: Compressed file is larger than original "
+                        f"({format_size(compressed_size)} > {format_size(original_size)})"
                     )
                 else:
                     # Skip compressed version
@@ -271,7 +274,8 @@ class MediaCompressor:
                         # In overwrite mode, just skip
                         self.logger.notice(f"Compressed file larger, skipping: {file_path.name}")
                         print(
-                            f"  ⚠️  Compressed file is larger ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
+                            f"  ⚠️  Compressed file is larger "
+                            f"({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
                         )
                         self.stats.update_stats(original_size, 0, 0, "skipped", folder_key, file_type, file_extension)
                     return

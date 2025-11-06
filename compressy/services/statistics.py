@@ -444,7 +444,8 @@ class StatisticsManager:
         cumulative["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         self.logger.debug(
-            f"Updated cumulative statistics: total_runs={cumulative['total_runs']}, total_files_processed={cumulative['total_files_processed']}"
+            f"Updated cumulative statistics: total_runs={cumulative['total_runs']}, "
+            f"total_files_processed={cumulative['total_files_processed']}"
         )
         self.save_cumulative_stats(cumulative)
 

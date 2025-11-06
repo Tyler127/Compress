@@ -50,9 +50,9 @@ class BackupManager:
             logger.info(f"Backup created successfully: {backup_path}")
             print(f"✓ Backup created successfully: {backup_path}")
             return backup_path
-        except Exception as e:
+        except Exception:
             logger.error(
-                f"Failed to create backup",
+                "Failed to create backup",
                 exc_info=True,
                 extra={"source": str(source_folder), "backup_path": str(backup_path)},
             )

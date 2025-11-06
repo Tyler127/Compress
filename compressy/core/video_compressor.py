@@ -26,7 +26,8 @@ class VideoCompressor:
         self.config = config
         self.logger = get_logger()
         self.logger.debug(
-            f"VideoCompressor initialized: crf={config.video_crf}, preset={config.video_preset}, resize={config.video_resize}"
+            f"VideoCompressor initialized: crf={config.video_crf}, "
+            f"preset={config.video_preset}, resize={config.video_resize}"
         )
 
     def compress(self, in_path: Path, out_path: Path) -> None:

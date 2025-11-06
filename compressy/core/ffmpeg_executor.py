@@ -118,7 +118,6 @@ class FFmpegExecutor:
         )
 
         last_update_time = time.time()
-        last_progress = None
 
         # Read stderr while process is running
         stderr_lines = []
@@ -130,12 +129,11 @@ class FFmpegExecutor:
                 progress = self.parse_progress(line)
 
                 if progress:
-                    last_progress = progress
                     current_time = time.time()
 
                     # Display progress update if interval has passed
                     if current_time - last_update_time >= progress_interval:
-                        progress_str = f"  [Progress] "
+                        progress_str = "  [Progress] "
                         if "time" in progress:
                             progress_str += f"Time: {progress['time']} | "
                         if "frame" in progress:
@@ -159,10 +157,6 @@ class FFmpegExecutor:
             for line in remaining_stderr.splitlines():
                 if line.strip():
                     stderr_lines.append(line.rstrip())
-                    # Check for final progress update
-                    progress = self.parse_progress(line)
-                    if progress:
-                        last_progress = progress
 
         stderr = "\n".join(stderr_lines)
 

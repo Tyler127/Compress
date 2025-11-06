@@ -4,8 +4,6 @@ Tests for compressy.utils.file_processor module.
 
 import os
 import time
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
