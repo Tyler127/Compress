@@ -15,6 +15,7 @@ class CompressionConfig:
     source_folder: Path
     video_crf: int = 23
     video_preset: str = "medium"
+    video_resize: Optional[int] = None
     image_quality: int = 100
     image_resize: Optional[int] = None
     recursive: bool = False
@@ -40,6 +41,7 @@ class ParameterValidator:
         ParameterValidator.validate_video_crf(config.video_crf)
         ParameterValidator.validate_image_quality(config.image_quality)
         ParameterValidator.validate_video_preset(config.video_preset)
+        ParameterValidator.validate_video_resize(config.video_resize)
         ParameterValidator.validate_image_resize(config.image_resize)
 
     @staticmethod
@@ -70,6 +72,12 @@ class ParameterValidator:
         ]
         if video_preset not in valid_presets:
             raise ValueError(f"video_preset must be one of {valid_presets}, got {video_preset}")
+
+    @staticmethod
+    def validate_video_resize(video_resize: Optional[int]) -> None:
+        """Validate video resize value."""
+        if video_resize is not None and not (0 <= video_resize <= 100):
+            raise ValueError(f"video_resize must be between 0 and 100, got {video_resize}")
 
     @staticmethod
     def validate_image_resize(image_resize: Optional[int]) -> None:

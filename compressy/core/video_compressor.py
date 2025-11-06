@@ -50,9 +50,17 @@ class VideoCompressor:
         Returns:
             List of FFmpeg arguments
         """
-        return [
-            "-i",
-            str(in_path),
+        ffmpeg_args = ["-i", str(in_path)]
+        
+        # Add video resize filter if specified (and not 0 or 100)
+        if self.config.video_resize is not None and 0 < self.config.video_resize < 100:
+            resize_factor = self.config.video_resize / 100
+            ffmpeg_args.extend([
+                "-vf",
+                f"scale=iw*{resize_factor}:ih*{resize_factor}:flags=lanczos"
+            ])
+        
+        ffmpeg_args.extend([
             "-vcodec",
             "libx264",
             "-crf",
@@ -67,4 +75,6 @@ class VideoCompressor:
             "0",
             "-y",  # Overwrite output file if it exists
             str(out_path),
-        ]
+        ])
+        
+        return ffmpeg_args

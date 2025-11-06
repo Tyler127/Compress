@@ -121,6 +121,12 @@ python compressy.py /path/to/videos --video-crf 28 --video-preset fast
 
 # Custom preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
 python compressy.py /path/to/videos --video-preset slow
+
+# Resize videos to 90% of original dimensions
+python compressy.py /path/to/videos --video-resize 90
+
+# Combine quality and resize for smaller file sizes
+python compressy.py /path/to/videos --video-crf 24 --video-resize 75
 ```
 
 **Video CRF Values:**
@@ -184,6 +190,7 @@ python compressy.py --view-history 5
 | `source_folder` | Path to folder containing media files | Required |
 | `--video-crf` | Video CRF value (0-51, lower = higher quality) | 23 |
 | `--video-preset` | Video encoding preset | medium |
+| `--video-resize` | Resize videos to % of original (0-100, 0 = no resize) | None |
 | `--image-quality` | Image quality (0-100, higher = better) | 100 |
 | `--image-resize` | Resize images to % of original (1-100) | None |
 | `-r, --recursive` | Process files recursively | False |
@@ -235,6 +242,9 @@ python compressy.py ~/Pictures/Photos --recursive --image-quality 85 --image-res
 ```bash
 # Compress videos with good quality for web distribution
 python compressy.py ~/Videos --recursive --video-crf 24 --video-preset fast
+
+# Compress and resize videos to 720p equivalent (smaller file sizes)
+python compressy.py ~/Videos --recursive --video-crf 24 --video-resize 75
 ```
 
 ### Example 3: Backup and compress

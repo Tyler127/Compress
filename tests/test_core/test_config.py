@@ -20,6 +20,7 @@ class TestCompressionConfig:
         assert config.source_folder == temp_dir
         assert config.video_crf == 23
         assert config.video_preset == "medium"
+        assert config.video_resize is None
         assert config.image_quality == 100
         assert config.image_resize is None
         assert config.recursive is False
@@ -37,6 +38,7 @@ class TestCompressionConfig:
             source_folder=temp_dir,
             video_crf=18,
             video_preset="slow",
+            video_resize=80,
             image_quality=85,
             image_resize=90,
             recursive=True,
@@ -50,6 +52,7 @@ class TestCompressionConfig:
 
         assert config.video_crf == 18
         assert config.video_preset == "slow"
+        assert config.video_resize == 80
         assert config.image_quality == 85
         assert config.image_resize == 90
         assert config.recursive is True
@@ -132,6 +135,27 @@ class TestParameterValidator:
         with pytest.raises(ValueError, match="video_preset must be one of"):
             ParameterValidator.validate_video_preset("invalid_preset")
 
+    def test_validate_video_resize_none(self):
+        """Test validation of None video resize (valid)."""
+        ParameterValidator.validate_video_resize(None)
+
+    def test_validate_video_resize_valid_range(self):
+        """Test validation of valid video resize values."""
+        # Valid range: 0-100
+        ParameterValidator.validate_video_resize(0)
+        ParameterValidator.validate_video_resize(50)
+        ParameterValidator.validate_video_resize(100)
+
+    def test_validate_video_resize_invalid_low(self):
+        """Test validation of video resize below minimum."""
+        with pytest.raises(ValueError, match="video_resize must be between 0 and 100"):
+            ParameterValidator.validate_video_resize(-1)
+
+    def test_validate_video_resize_invalid_high(self):
+        """Test validation of video resize above maximum."""
+        with pytest.raises(ValueError, match="video_resize must be between 0 and 100"):
+            ParameterValidator.validate_video_resize(101)
+
     def test_validate_image_resize_none(self):
         """Test validation of None image resize (valid)."""
         ParameterValidator.validate_image_resize(None)
@@ -159,6 +183,7 @@ class TestParameterValidator:
             source_folder=temp_dir,
             video_crf=25,
             video_preset="fast",
+            video_resize=80,
             image_quality=90,
             image_resize=75,
         )
@@ -180,6 +205,12 @@ class TestParameterValidator:
     def test_validate_invalid_preset_in_config(self, temp_dir):
         """Test validation catches invalid preset in config."""
         config = CompressionConfig(source_folder=temp_dir, video_preset="invalid")
+        with pytest.raises(ValueError):
+            ParameterValidator.validate(config)
+
+    def test_validate_invalid_video_resize_in_config(self, temp_dir):
+        """Test validation catches invalid video resize in config."""
+        config = CompressionConfig(source_folder=temp_dir, video_resize=150)
         with pytest.raises(ValueError):
             ParameterValidator.validate(config)
 
