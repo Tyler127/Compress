@@ -352,15 +352,6 @@ class StatisticsManager:
                     except (ValueError, TypeError):
                         return default
 
-                def safe_json_load(value, default=None):
-                    """Safely load JSON value."""
-                    if value is None or value == "":
-                        return default if default is not None else {}
-                    try:
-                        return json.loads(value)
-                    except (ValueError, TypeError):
-                        return default if default is not None else {}
-
                 stats = {
                     "total_runs": safe_int(row.get("total_runs")),
                     "total_files_processed": safe_int(row.get("total_files_processed")),
