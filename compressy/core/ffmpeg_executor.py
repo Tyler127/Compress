@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from compressy.utils.logger import get_logger
+
 
 # ============================================================================
 # FFmpeg Executor
@@ -21,12 +23,15 @@ class FFmpegExecutor:
         Args:
             ffmpeg_path: Path to FFmpeg executable. If None, will attempt to find it.
         """
+        self.logger = get_logger()
         self.ffmpeg_path = ffmpeg_path or self.find_ffmpeg()
         if self.ffmpeg_path is None:
+            self.logger.critical("FFmpeg not found in PATH or common locations")
             raise FileNotFoundError(
                 "FFmpeg not found. Please install FFmpeg and add it to PATH, "
                 "or specify the path using --ffmpeg-path option."
             )
+        self.logger.debug(f"FFmpeg executor initialized with path: {self.ffmpeg_path}")
 
     @staticmethod
     def find_ffmpeg() -> Optional[str]:
@@ -101,6 +106,7 @@ class FFmpegExecutor:
             CompletedProcess from subprocess
         """
         cmd = [self.ffmpeg_path] + args
+        self.logger.debug(f"Executing FFmpeg command for {filename}: {' '.join(cmd)}")
 
         # Start FFmpeg process with unbuffered stderr
         process = subprocess.Popen(
@@ -164,6 +170,11 @@ class FFmpegExecutor:
         result = subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
 
         if result.returncode != 0:
+            self.logger.error(
+                f"FFmpeg command failed for {filename} with return code {result.returncode}",
+                extra={"return_code": result.returncode, "stderr": stderr[:500]}  # Log first 500 chars of stderr
+            )
             raise subprocess.CalledProcessError(result.returncode, cmd, stdout, stderr)
 
+        self.logger.debug(f"FFmpeg command completed successfully for {filename}")
         return result

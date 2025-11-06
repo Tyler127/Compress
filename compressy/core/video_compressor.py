@@ -3,6 +3,7 @@ from typing import List
 
 from compressy.core.config import CompressionConfig
 from compressy.core.ffmpeg_executor import FFmpegExecutor
+from compressy.utils.logger import get_logger
 
 
 # ============================================================================
@@ -23,6 +24,8 @@ class VideoCompressor:
         """
         self.ffmpeg = ffmpeg_executor
         self.config = config
+        self.logger = get_logger()
+        self.logger.debug(f"VideoCompressor initialized: crf={config.video_crf}, preset={config.video_preset}, resize={config.video_resize}")
 
     def compress(self, in_path: Path, out_path: Path) -> None:
         """
@@ -32,7 +35,9 @@ class VideoCompressor:
             in_path: Path to input video file
             out_path: Path to output video file
         """
+        self.logger.debug(f"Compressing video: {in_path.name} -> {out_path.name}")
         ffmpeg_args = self._build_ffmpeg_args(in_path, out_path)
+        self.logger.debug(f"FFmpeg args for {in_path.name}: {' '.join(ffmpeg_args)}")
         self.ffmpeg.run_with_progress(
             ffmpeg_args,
             progress_interval=self.config.progress_interval,

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from compressy.utils.format import format_size
+from compressy.utils.logger import get_logger
 
 
 # ============================================================================
@@ -297,6 +298,8 @@ class StatisticsManager:
         self.statistics_dir.mkdir(parents=True, exist_ok=True)
         self.cumulative_stats_file = self.statistics_dir / "statistics.csv"
         self.run_history_file = self.statistics_dir / "run_history.csv"
+        self.logger = get_logger()
+        self.logger.debug(f"StatisticsManager initialized with directory: {statistics_dir}")
 
     def load_cumulative_stats(self) -> Dict:
         """
@@ -380,9 +383,11 @@ class StatisticsManager:
 
                 return stats
         except (ValueError, KeyError, csv.Error) as e:
+            self.logger.warning(f"Error reading statistics file: {e}. Creating new file.")
             print(f"Warning: Error reading statistics file ({e}). Creating new file.")
             return default_stats
         except Exception as e:
+            self.logger.warning(f"Unexpected error reading statistics file: {e}. Creating new file.")
             print(f"Warning: Unexpected error reading statistics file ({e}). Creating new file.")
             return default_stats
 
@@ -438,6 +443,7 @@ class StatisticsManager:
         cumulative["format_stats_json"] = json.dumps(cumulative_format_stats)
         cumulative["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        self.logger.debug(f"Updated cumulative statistics: total_runs={cumulative['total_runs']}, total_files_processed={cumulative['total_files_processed']}")
         self.save_cumulative_stats(cumulative)
 
     def save_cumulative_stats(self, stats: Dict) -> None:
@@ -477,9 +483,12 @@ class StatisticsManager:
                 )
                 writer.writeheader()
                 writer.writerow(stats)
+            self.logger.debug(f"Saved cumulative statistics to {self.cumulative_stats_file}")
         except PermissionError:
+            self.logger.error(f"Permission denied when writing to {self.cumulative_stats_file}")
             print(f"Warning: Permission denied when writing to {self.cumulative_stats_file}")
         except Exception as e:
+            self.logger.error(f"Error saving cumulative statistics: {e}", exc_info=True)
             print(f"Warning: Error saving cumulative statistics ({e})")
 
     def append_run_history(self, run_stats: Dict, cmd_args: Dict) -> None:
@@ -549,9 +558,12 @@ class StatisticsManager:
                 }
 
                 writer.writerow(run_record)
+            self.logger.debug(f"Appended run history to {self.run_history_file}")
         except PermissionError:
+            self.logger.error(f"Permission denied when writing to {self.run_history_file}")
             print(f"Warning: Permission denied when writing to {self.run_history_file}")
         except Exception as e:
+            self.logger.error(f"Error saving run history: {e}", exc_info=True)
             print(f"Warning: Error saving run history ({e})")
 
     def print_stats(self) -> None:

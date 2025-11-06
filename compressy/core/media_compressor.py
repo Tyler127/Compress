@@ -12,6 +12,7 @@ from compressy.services.backup import BackupManager
 from compressy.services.statistics import StatisticsTracker
 from compressy.utils.file_processor import FileProcessor
 from compressy.utils.format import format_size
+from compressy.utils.logger import get_logger
 
 
 # ============================================================================
@@ -36,10 +37,13 @@ class MediaCompressor:
         self.file_processor = FileProcessor()
         self.stats = StatisticsTracker(config.recursive)
         self.backup_manager = BackupManager() if config.backup_dir else None
+        self.logger = get_logger()
 
         # File extension lists
         self.video_exts = [".mp4", ".mov", ".mkv", ".avi"]
         self.image_exts = [".jpg", ".jpeg", ".png", ".webp"]
+        
+        self.logger.debug(f"MediaCompressor initialized with config: video_crf={config.video_crf}, image_quality={config.image_quality}, recursive={config.recursive}")
 
     def compress(self) -> Dict:
         """
@@ -66,6 +70,7 @@ class MediaCompressor:
         all_files = self._collect_files()
 
         if not all_files:
+            self.logger.info("No media files found to compress")
             print("No media files found to compress.")
             result = self.stats.get_stats()
             if not self.config.recursive:
@@ -76,10 +81,12 @@ class MediaCompressor:
         compressed_folder = self.config.source_folder / "compressed"
         if not self.config.overwrite:
             compressed_folder.mkdir(parents=True, exist_ok=True)
+            self.logger.debug(f"Created compressed folder: {compressed_folder}")
 
         total_files_count = len(all_files)
         # Set total_files once - this represents all files found upfront
         self.stats.stats["total_files"] = total_files_count
+        self.logger.info(f"Found {total_files_count} media file(s) to process")
         print(f"Found {total_files_count} media file(s) to process...")
 
         # Process each file
@@ -165,9 +172,11 @@ class MediaCompressor:
         if not self.config.overwrite and out_path.exists():
             existing_size = out_path.stat().st_size
             self.stats.update_stats(original_size, existing_size, 0, "skipped", folder_key, file_type, file_extension)
+            self.logger.debug(f"Skipping already compressed file: {file_path.name}")
             print(f"[{idx}/{total_files}] Skipping (already exists): {file_path.name} ({format_size(existing_size)})")
             return
 
+        self.logger.info(f"Processing file [{idx}/{total_files}]: {file_path.name} ({format_size(original_size)})")
         print(f"[{idx}/{total_files}] Processing: {file_path.name} ({format_size(original_size)})")
 
         # Track processing time
@@ -193,6 +202,7 @@ class MediaCompressor:
             # Check if compressed file is larger than original
             if compressed_size > original_size:
                 if self.config.keep_if_larger:
+                    self.logger.warning(f"Compressed file is larger than original: {file_path.name} ({format_size(compressed_size)} > {format_size(original_size)})")
                     print(
                         f"  ⚠️  Warning: Compressed file is larger than original ({format_size(compressed_size)} > {format_size(original_size)})"
                     )
@@ -205,6 +215,7 @@ class MediaCompressor:
                         # Copy original to compressed folder
                         shutil.copy2(in_path, out_path)
                         self.file_processor.preserve_timestamps(in_path, out_path)
+                        self.logger.notice(f"Compressed file larger, copied original instead: {file_path.name}")
                         print(f"  ⚠️  Compressed file larger, copying original instead: {format_size(original_size)}")
 
                         # Track as processed with no compression
@@ -226,6 +237,7 @@ class MediaCompressor:
                         )
                     else:
                         # In overwrite mode, just skip
+                        self.logger.notice(f"Compressed file larger, skipping: {file_path.name}")
                         print(
                             f"  ⚠️  Compressed file is larger ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
                         )
@@ -259,18 +271,25 @@ class MediaCompressor:
 
             # Print result
             if compression_ratio < 0:
+                self.logger.warning(f"Compression increased file size: {file_path.name} ({compression_ratio:.1f}% increase)")
                 print(
                     f"  ⚠️  Compressed (larger): {format_size(original_size)} → {format_size(compressed_size)} "
                     f"({compression_ratio:.1f}% increase)"
                 )
             else:
+                self.logger.info(f"Successfully compressed: {file_path.name} ({compression_ratio:.1f}% reduction)")
                 print(
                     f"  ✓ Compressed: {format_size(original_size)} → {format_size(compressed_size)} "
                     f"({compression_ratio:.1f}% reduction)"
                 )
 
         except subprocess.CalledProcessError as e:
-            print(f"  ✗ Error processing {in_path}: FFmpeg error")
+            self.logger.error(
+                f"FFmpeg error processing file: {in_path.name}",
+                exc_info=True,
+                extra={"file_path": str(in_path), "return_code": e.returncode}
+            )
+            print(f"  ✗ Error processing {in_path.name}: FFmpeg error")
             file_processing_time = time.time() - file_start_time
 
             file_info = {
@@ -292,7 +311,12 @@ class MediaCompressor:
                 out_path.unlink()
 
         except Exception as e:
-            print(f"  ✗ Error processing {in_path}: {e}")
+            self.logger.error(
+                f"Error processing file: {in_path.name}",
+                exc_info=True,
+                extra={"file_path": str(in_path), "error_type": type(e).__name__}
+            )
+            print(f"  ✗ Error processing {in_path.name}: {e}")
             file_processing_time = time.time() - file_start_time
 
             file_info = {

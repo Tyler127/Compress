@@ -2,6 +2,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from compressy.utils.logger import get_logger
+
 
 # ============================================================================
 # Backup Manager
@@ -23,7 +25,11 @@ class BackupManager:
         Returns:
             Path to the created backup folder
         """
+        logger = get_logger()
+        logger.info(f"Starting backup creation for: {source_folder}")
+        
         backup_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Backup directory created/verified: {backup_dir}")
 
         # Create backup folder with the same name as source folder
         backup_folder_name = source_folder.name
@@ -33,12 +39,17 @@ class BackupManager:
         if backup_path.exists():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = backup_dir / f"{backup_folder_name}_{timestamp}"
+            logger.debug(f"Backup path already exists, using timestamped name: {backup_path}")
 
         print(f"Creating backup to: {backup_path}")
         print("This may take a while for large folders...")
 
-        # Copy entire directory tree
-        shutil.copytree(source_folder, backup_path, dirs_exist_ok=False)
-
-        print(f"✓ Backup created successfully: {backup_path}")
-        return backup_path
+        try:
+            # Copy entire directory tree
+            shutil.copytree(source_folder, backup_path, dirs_exist_ok=False)
+            logger.info(f"Backup created successfully: {backup_path}")
+            print(f"✓ Backup created successfully: {backup_path}")
+            return backup_path
+        except Exception as e:
+            logger.error(f"Failed to create backup", exc_info=True, extra={"source": str(source_folder), "backup_path": str(backup_path)})
+            raise
