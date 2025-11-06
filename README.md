@@ -5,13 +5,43 @@ A powerful Python command-line tool for compressing videos and images using FFmp
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 [![Code Coverage](https://img.shields.io/badge/coverage-100%25-success.svg)](https://github.com/yourusername/Compressy)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+- [Usage](#-usage)
+  - [Basic Usage](#basic-usage)
+  - [Video Compression](#video-compression)
+  - [Image Compression](#image-compression)
+  - [Advanced Options](#advanced-options)
+  - [Viewing Statistics](#viewing-statistics)
+- [Command-Line Arguments](#-command-line-arguments)
+- [Output](#-output)
+  - [Reports](#reports)
+  - [Statistics](#statistics)
+- [Examples](#-examples)
+- [Project Structure](#️-project-structure)
+- [Development](#-development)
+  - [Running Tests](#running-tests)
+  - [Code Quality](#code-quality)
+- [License](#-license)
+- [Contributing](#-contributing)
+- [Important Notes](#️-important-notes)
+- [Troubleshooting](#-troubleshooting)
+- [Additional Resources](#-additional-resources)
+- [Acknowledgments](#-acknowledgments)
 
 ## ✨ Features
 
 - **🎥 Video Compression**: Compress videos using H.264 codec with customizable CRF and encoding presets
 - **🖼️ Image Compression**: Compress images (JPEG, PNG, WebP) with quality control and resizing options
 - **📁 Batch Processing**: Process entire folders recursively with support for nested directories
-- **🔄 Format Conversion**: Optionally convert all images to JPEG for maximum compression
+- **🔄 Format Conversion**: Converts all images to JPEG for maximum compression (unless `--preserve-format` is used)
 - **📊 Statistics Tracking**: Track compression statistics across multiple runs with cumulative totals
 - **📈 Detailed Reports**: Generate CSV reports with per-file compression details
 - **💾 Backup Support**: Automatically create backups before compression
