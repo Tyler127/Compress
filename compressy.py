@@ -36,6 +36,12 @@ def main():
         help="Video encoding preset (default: medium)"
     )
     parser.add_argument(
+        "--video-resize",
+        type=int,
+        default=None,
+        help="Resize videos to percentage of original dimensions (0-100, e.g., 90 = 90%% of original size, 0 = no resize, default: no resize)"
+    )
+    parser.add_argument(
         "--image-quality",
         type=int,
         default=100,
@@ -128,6 +134,7 @@ def main():
             source_folder=Path(args.source_folder),
             video_crf=args.video_crf,
             video_preset=args.video_preset,
+            video_resize=args.video_resize,
             image_quality=args.image_quality,
             image_resize=args.image_resize,
             recursive=args.recursive,
@@ -152,6 +159,7 @@ def main():
             'source_folder': args.source_folder,
             'video_crf': args.video_crf,
             'video_preset': args.video_preset,
+            'video_resize': args.video_resize,
             'image_quality': args.image_quality,
             'image_resize': args.image_resize,
             'recursive': args.recursive,
