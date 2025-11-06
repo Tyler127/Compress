@@ -3,13 +3,18 @@
 Code cleanup script that runs all formatting checks and fixes from lint.yml.
 
 This script will:
-1. Format code with Black
-2. Sort imports with isort
+1. Format code with Black (or check formatting with --check flag)
+2. Sort imports with isort (or check imports with --check flag)
 3. Run flake8 for linting checks
 4. Run pylint for additional linting
 5. Run mypy for type checking
+
+Usage:
+    python code_cleanup.py         # Format and fix code
+    python code_cleanup.py --check # Check only (like CI does)
 """
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -63,7 +68,9 @@ def run_command(cmd: List[str], check: bool = False) -> Tuple[int, str, str]:
         Tuple of (exit_code, stdout, stderr)
     """
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=check)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=check
+        )
         return result.returncode, result.stdout, result.stderr
     except subprocess.CalledProcessError as e:
         return e.returncode, e.stdout, e.stderr
@@ -94,37 +101,63 @@ def check_dependencies() -> bool:
     return True
 
 
-def format_with_black() -> bool:
+def format_with_black(check_only: bool = False) -> bool:
     """Format code with Black."""
-    print_header("Running Black (Code Formatter)")
+    action = "Checking" if check_only else "Formatting"
+    print_header(f"Running Black (Code Formatter) - {action}")
 
-    returncode, stdout, stderr = run_command(["black", "compressy", "tests"])
+    cmd = ["black", "compressy", "tests"]
+    if check_only:
+        cmd.extend(["--check", "--diff"])
+
+    returncode, stdout, stderr = run_command(cmd)
 
     if returncode == 0:
-        print_success("Black formatting completed")
+        msg = (
+            "Black check passed"
+            if check_only
+            else "Black formatting completed"
+        )
+        print_success(msg)
         if stdout:
             print(stdout)
         return True
     else:
-        print_error("Black formatting failed")
+        msg = "Black check failed" if check_only else "Black formatting failed"
+        print_error(msg)
+        if stdout:
+            print(stdout)
         if stderr:
             print(stderr)
         return False
 
 
-def sort_imports_with_isort() -> bool:
+def sort_imports_with_isort(check_only: bool = False) -> bool:
     """Sort imports with isort."""
-    print_header("Running isort (Import Sorter)")
+    action = "Checking" if check_only else "Sorting"
+    print_header(f"Running isort (Import Sorter) - {action}")
 
-    returncode, stdout, stderr = run_command(["isort", "compressy", "tests"])
+    cmd = ["isort", "compressy", "tests"]
+    if check_only:
+        cmd.extend(["--check-only", "--diff"])
+
+    returncode, stdout, stderr = run_command(cmd)
 
     if returncode == 0:
-        print_success("Import sorting completed")
+        msg = (
+            "isort check passed"
+            if check_only
+            else "Import sorting completed"
+        )
+        print_success(msg)
         if stdout:
             print(stdout)
         return True
     else:
-        print_error("Import sorting failed")
+        msg = "isort check failed" if check_only else "Import sorting failed"
+        print_error(msg)
+        if stdout:
+            print(stdout)
         if stderr:
             print(stderr)
         return False
@@ -232,9 +265,22 @@ def type_check_with_mypy() -> str:
 
 def main() -> int:
     """Main function to run all checks."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Run code formatting and quality checks"
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check mode only (like CI) - don't modify files",
+    )
+    args = parser.parse_args()
+
+    mode = "CHECK MODE (like CI)" if args.check else "FIX MODE"
     print(f"\n{Colors.BOLD}{Colors.OKCYAN}")
     print("╔════════════════════════════════════════════════════════════╗")
     print("║           Code Cleanup and Quality Checks                  ║")
+    print(f"║                    {mode:^30}                  ║")
     print("╚════════════════════════════════════════════════════════════╝")
     print(Colors.ENDC)
 
@@ -252,8 +298,10 @@ def main() -> int:
     results = {}
 
     # Run all checks and fixes
-    results["Black formatting"] = format_with_black()
-    results["isort import sorting"] = sort_imports_with_isort()
+    results["Black formatting"] = format_with_black(check_only=args.check)
+    results["isort import sorting"] = sort_imports_with_isort(
+        check_only=args.check
+    )
     results["flake8 linting"] = lint_with_flake8()
     results["pylint linting"] = lint_with_pylint()
     results["mypy type checking"] = type_check_with_mypy()
@@ -280,7 +328,9 @@ def main() -> int:
     else:
         warning_msg = "Some checks found issues. Please review the output."
         print(f"{Colors.WARNING}{warning_msg}{Colors.ENDC}")
-        return 0  # Return 0 since this is a cleanup script, not a CI check
+        # In check mode, return non-zero exit code (like CI does)
+        # In fix mode, return 0 since this is a cleanup script
+        return 1 if args.check else 0
 
 
 if __name__ == "__main__":
