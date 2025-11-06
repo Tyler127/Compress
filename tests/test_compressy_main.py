@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+
 # Import the main function from the root compressy.py
 # Load it as a module since it's not in a package
 _root_dir = Path(__file__).resolve().parent.parent

@@ -4,7 +4,7 @@ Tests for compressy.utils.format module.
 
 import pytest
 
-from compressy.utils.format import format_size, parse_size, parse_resolution
+from compressy.utils.format import format_size, parse_resolution, parse_size
 
 
 @pytest.mark.unit
