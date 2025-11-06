@@ -150,10 +150,21 @@ class MediaCompressor:
         # Add to total original size (but not total_files count - that's set once upfront)
         self.stats.add_total_file_size(original_size, folder_key)
 
+        # Determine file type and extension
+        file_suffix = file_path.suffix.lower()
+        if file_suffix in self.video_exts:
+            file_type = "video"
+        elif file_suffix in self.image_exts:
+            file_type = "image"
+        else:
+            file_type = None
+        
+        file_extension = file_suffix.lstrip('.') if file_suffix else None
+
         # Skip if already compressed and not overwriting
         if not self.config.overwrite and out_path.exists():
             existing_size = out_path.stat().st_size
-            self.stats.update_stats(original_size, existing_size, 0, "skipped", folder_key)
+            self.stats.update_stats(original_size, existing_size, 0, "skipped", folder_key, file_type, file_extension)
             print(f"[{idx}/{total_files}] Skipping (already exists): {file_path.name} ({format_size(existing_size)})")
             return
 
@@ -164,9 +175,9 @@ class MediaCompressor:
 
         try:
             # Compress based on file type
-            if file_path.suffix.lower() in self.video_exts:
+            if file_suffix in self.video_exts:
                 self.video_compressor.compress(in_path, out_path)
-            elif file_path.suffix.lower() in self.image_exts:
+            elif file_suffix in self.image_exts:
                 self.image_compressor.compress(in_path, out_path)
             else:
                 raise ValueError(f"Unsupported file type: {file_path.suffix}")
@@ -206,22 +217,24 @@ class MediaCompressor:
                             "compression_ratio": 0.0,
                             "processing_time": file_processing_time,
                             "status": "success (copied original)",
+                            "file_type": file_type,
+                            "file_extension": file_extension,
                         }
                         self.stats.add_file_info(file_info, folder_key)
-                        self.stats.update_stats(original_size, original_size, 0, "processed", folder_key)
+                        self.stats.update_stats(original_size, original_size, 0, "processed", folder_key, file_type, file_extension)
                     else:
                         # In overwrite mode, just skip
                         print(
                             f"  ⚠️  Compressed file is larger ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
                         )
-                        self.stats.update_stats(original_size, 0, 0, "skipped", folder_key)
+                        self.stats.update_stats(original_size, 0, 0, "skipped", folder_key, file_type, file_extension)
                     return
 
             # Calculate processing time
             file_processing_time = time.time() - file_start_time
 
             # Update statistics
-            self.stats.update_stats(original_size, compressed_size, space_saved, "processed", folder_key)
+            self.stats.update_stats(original_size, compressed_size, space_saved, "processed", folder_key, file_type, file_extension)
 
             file_info = {
                 "name": str(file_path.relative_to(self.config.source_folder)),
@@ -231,6 +244,8 @@ class MediaCompressor:
                 "compression_ratio": compression_ratio,
                 "processing_time": file_processing_time,
                 "status": "success",
+                "file_type": file_type,
+                "file_extension": file_extension,
             }
             self.stats.add_file_info(file_info, folder_key)
 
@@ -257,6 +272,8 @@ class MediaCompressor:
             file_info = {
                 "name": str(file_path.relative_to(self.config.source_folder)),
                 "original_size": original_size,
+                "file_type": file_type,
+                "file_extension": file_extension,
                 "compressed_size": 0,
                 "space_saved": 0,
                 "compression_ratio": 0,
@@ -264,7 +281,7 @@ class MediaCompressor:
                 "status": f"error: {str(e)}",
             }
             self.stats.add_file_info(file_info, folder_key)
-            self.stats.update_stats(original_size, 0, 0, "error", folder_key)
+            self.stats.update_stats(original_size, 0, 0, "error", folder_key, file_type, file_extension)
 
             # Clean up failed output file
             if out_path.exists():
@@ -277,6 +294,8 @@ class MediaCompressor:
             file_info = {
                 "name": str(file_path.relative_to(self.config.source_folder)),
                 "original_size": original_size,
+                "file_type": file_type,
+                "file_extension": file_extension,
                 "compressed_size": 0,
                 "space_saved": 0,
                 "compression_ratio": 0,
@@ -284,7 +303,7 @@ class MediaCompressor:
                 "status": f"error: {str(e)}",
             }
             self.stats.add_file_info(file_info, folder_key)
-            self.stats.update_stats(original_size, 0, 0, "error", folder_key)
+            self.stats.update_stats(original_size, 0, 0, "error", folder_key, file_type, file_extension)
 
             # Clean up failed output file
             if out_path.exists():
