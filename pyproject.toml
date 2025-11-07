@@ -1,6 +1,40 @@
+ [build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compressy"
+version = "0.1.0"
+description = "Compressy is a CLI tool for compressing videos and images using FFmpeg, with batch processing, statistics tracking, and detailed reports"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Tyler Larson" },
+    { name = "Compressy Contributors" }
+]
+keywords = ["ffmpeg", "compression", "media", "video", "image"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Multimedia :: Video :: Conversion",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+compressy = "compressy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["compressy", "compressy.*"]
+
 [tool.black]
 line-length = 120
-target-version = ['py314']
+target-version = ['py313']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -34,14 +68,14 @@ lines_after_imports = 2
 max-line-length = 120
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["compressy", "."]
+source = ["compressy"]
 omit = [
     "tests/*",
     "*/tests/*",
@@ -50,7 +84,7 @@ omit = [
     "*/htmlcov/*",
     "*/site-packages/*",
     "setup.py",
-    "code_cleanup.py"
+    "code_cleanup.py",
 ]
 
 [tool.coverage.report]

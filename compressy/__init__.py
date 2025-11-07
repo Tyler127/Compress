@@ -2,9 +2,10 @@
 Compressy - Media compression tool for videos and images.
 """
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 
 # Package-level exports for convenience
+from compressy.cli import main
 from compressy.core.config import CompressionConfig, ParameterValidator
 from compressy.core.ffmpeg_executor import FFmpegExecutor
 from compressy.core.image_compressor import ImageCompressor
@@ -32,4 +33,5 @@ __all__ = [
     "format_size",
     "parse_size",
     "parse_resolution",
+    "main",
 ]
