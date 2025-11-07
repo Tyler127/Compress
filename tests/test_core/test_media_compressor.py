@@ -637,7 +637,7 @@ class TestMediaCompressor:
             temp_file_created = [False]
 
             # Update mock_stat to return correct size after compression
-            def mock_stat_updated(self):
+            def mock_stat_updated(self, **kwargs):
                 path_str = str(self)
                 if path_str == str(image_file):
                     return os.stat_result((0, 0, 0, 0, 0, 0, 1000, 0, 0, 0))
