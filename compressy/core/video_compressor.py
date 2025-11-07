@@ -58,6 +58,7 @@ class VideoCompressor:
         # logic (using -2 conventionally) could be refactored, but assumes incoming values are correct.
         if getattr(self.config, "video_resolution", None):
             from compressy.utils.format import parse_resolution
+
             width, height = parse_resolution(self.config.video_resolution)
             # Use -2 for width or height to ensure divisibility by 2 (FFmpeg requirement)
             args.extend(["-vf", f"scale={width}:{height}"])
@@ -68,35 +69,38 @@ class VideoCompressor:
             resize_factor = self.config.video_resize / 100
             # FFmpeg scale filter can use expressions like iw (input width) and ih (input height), so we multiply them.
             # 'flags=lanczos' is used for better quality resampling.
-            args.extend([
-                "-vf",
-                f"scale=iw*{resize_factor}:ih*{resize_factor}:flags=lanczos"
-            ])
-        
+            args.extend(["-vf", f"scale=iw*{resize_factor}:ih*{resize_factor}:flags=lanczos"])
+
         # Add video codec settings
-        args.extend([
-            "-vcodec",
-            "libx264",
-            "-crf",
-            str(self.config.video_crf),
-            "-preset",
-            self.config.video_preset,
-        ])
-        
+        args.extend(
+            [
+                "-vcodec",
+                "libx264",
+                "-crf",
+                str(self.config.video_crf),
+                "-preset",
+                self.config.video_preset,
+            ]
+        )
+
         # Add audio codec settings
-        args.extend([
-            "-acodec",
-            "aac",
-            "-b:a",
-            "128k",
-        ])
-        
+        args.extend(
+            [
+                "-acodec",
+                "aac",
+                "-b:a",
+                "128k",
+            ]
+        )
+
         # Preserve metadata and allow overwrite
-        args.extend([
-            "-map_metadata",
-            "0",
-            "-y",  # Overwrite output file if it exists
-            str(out_path),
-        ])
-        
+        args.extend(
+            [
+                "-map_metadata",
+                "0",
+                "-y",  # Overwrite output file if it exists
+                str(out_path),
+            ]
+        )
+
         return args

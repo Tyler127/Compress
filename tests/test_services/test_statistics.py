@@ -3,8 +3,7 @@ Tests for compressy.services.statistics module.
 """
 
 import csv
-from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -458,8 +457,6 @@ class TestStatisticsManager:
         manager.cumulative_stats_file.touch()
 
         # Mock csv.DictReader to raise csv.Error when next() is called
-        original_dictreader = csv.DictReader
-
         class MockDictReader:
             def __init__(self, *args, **kwargs):
                 pass
@@ -847,10 +844,6 @@ class TestStatisticsManager:
         manager.save_cumulative_stats(stats)
 
         # Mock json.loads to raise TypeError
-        import json
-
-        original_loads = json.loads
-
         def mock_loads_raise_typeerror(*args, **kwargs):
             raise TypeError("Invalid type")
 

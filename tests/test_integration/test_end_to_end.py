@@ -74,14 +74,14 @@ class TestEndToEnd:
         original_exists = Path.exists
 
         # Mock file sizes - use os.stat_result for proper attribute access
-        def mock_stat(self):
+        def mock_stat(self, **kwargs):
             """Mock Path.stat() as an instance method."""
             path_str = str(self)
             # If file exists, use real stat (for files created by mock_run_with_progress)
             try:
                 if original_exists(self):
                     return original_stat(self)
-            except:
+            except Exception:
                 pass
 
             # Otherwise use mock values
@@ -200,14 +200,14 @@ class TestEndToEnd:
         original_stat = Path.stat
         original_exists = Path.exists
 
-        def mock_stat(self):
+        def mock_stat(self, **kwargs):
             """Mock Path.stat() as an instance method."""
             path_str = str(self)
             # If file exists, use real stat (for files created by mock_run_with_progress)
             try:
                 if original_exists(self):
                     return original_stat(self)
-            except:
+            except Exception:
                 pass
 
             # Otherwise use mock values
@@ -285,7 +285,7 @@ class TestEndToEnd:
 
         compressor = MediaCompressor(config)
 
-        def mock_stat(self):
+        def mock_stat(self, **kwargs):
             """Mock Path.stat() as an instance method."""
             if self == test_file:
                 size = 1000
@@ -331,7 +331,7 @@ class TestEndToEnd:
 
         compressor = MediaCompressor(config)
 
-        def mock_stat(self):
+        def mock_stat(self, **kwargs):
             """Mock Path.stat() as an instance method."""
             if self == test_file:
                 size = 1000

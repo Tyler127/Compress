@@ -115,9 +115,10 @@ class ParameterValidator:
         """Validate video resolution format."""
         if video_resolution is None:
             return
-        
+
         # Import parse_resolution to validate
         from compressy.utils.format import parse_resolution
+
         try:
             parse_resolution(video_resolution)
         except ValueError as e:

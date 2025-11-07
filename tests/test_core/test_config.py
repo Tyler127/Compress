@@ -2,8 +2,6 @@
 Tests for compressy.core.config module.
 """
 
-from pathlib import Path
-
 import pytest
 
 from compressy.core.config import CompressionConfig, ParameterValidator
@@ -298,11 +296,11 @@ class TestParameterValidator:
             output_dir=output_dir,
             video_resolution="1080p",
         )
-        
+
         assert config.min_size == 1024
         assert config.max_size == 1024 * 1024
         assert config.output_dir == output_dir
         assert config.video_resolution == "1080p"
-        
+
         # Should validate successfully
         ParameterValidator.validate(config)

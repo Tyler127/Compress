@@ -5,9 +5,10 @@ Tests for the main compressy.py script.
 import importlib.util
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 
 # Import the main function from the root compressy.py
 # Load it as a module since it's not in a package

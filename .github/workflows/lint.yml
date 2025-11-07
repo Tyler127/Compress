@@ -2,6 +2,7 @@ name: Linting and Code Quality
 
 on:
   push:
+    branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
@@ -10,6 +11,7 @@ jobs:
   lint:
     name: Code Quality Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
     - uses: actions/checkout@v4
@@ -49,6 +51,7 @@ jobs:
   format-check:
     name: Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
     - uses: actions/checkout@v4

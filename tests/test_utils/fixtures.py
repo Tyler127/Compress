@@ -2,8 +2,6 @@
 Test data and file fixtures.
 """
 
-import shutil
-import tempfile
 from pathlib import Path
 from typing import List
 

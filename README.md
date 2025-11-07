@@ -2,7 +2,7 @@
 
 A powerful Python command-line tool for compressing videos and images using FFmpeg, with intelligent quality settings, batch processing, and comprehensive statistics tracking.
 
-[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/downloads/)
 [![Code Coverage](https://img.shields.io/badge/coverage-100%25-success.svg)](https://github.com/yourusername/Compressy)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
