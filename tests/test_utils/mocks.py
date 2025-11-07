@@ -2,10 +2,8 @@
 Reusable mock objects for testing.
 """
 
-import subprocess
-from subprocess import CompletedProcess
 from typing import Dict, List
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 
 def mock_ffmpeg_progress_line(frame: int = 100, fps: float = 25.0, time: str = "00:00:10.00") -> str:

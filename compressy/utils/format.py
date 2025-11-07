@@ -42,10 +42,7 @@ def parse_size(size_str: str) -> int:
     match = re.match(r"^(-?[\d.]+)\s*([KMGT]?B?)$", size_str)
 
     if not match:
-        raise ValueError(
-            f"Invalid size format: {size_str}. "
-            f"Expected format like '10MB', '1.5GB', '500KB'"
-        )
+        raise ValueError(f"Invalid size format: {size_str}. " f"Expected format like '10MB', '1.5GB', '500KB'")
 
     try:
         value = float(match.group(1))

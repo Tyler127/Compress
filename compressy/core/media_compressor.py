@@ -221,9 +221,9 @@ class MediaCompressor:
             # Check if compressed file is larger than original
             if compressed_size > original_size:
                 if self.config.keep_if_larger:
-                    print(
-                        f"  ⚠️  Warning: Compressed file is larger than original ({format_size(compressed_size)} > {format_size(original_size)})"
-                    )
+                    message = "  ⚠️  Warning: Compressed file is larger than original"
+                    message += f" ({format_size(compressed_size)} > {format_size(original_size)})"
+                    print(message)
                 else:
                     # Skip compressed version
                     if out_path.exists():
@@ -254,9 +254,9 @@ class MediaCompressor:
                         )
                     else:
                         # In overwrite mode, just skip
-                        print(
-                            f"  ⚠️  Compressed file is larger ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
-                        )
+                        message = "  ⚠️  Compressed file is larger"
+                        message += f" ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
+                        print(message)
                         self.stats.update_stats(original_size, 0, 0, "skipped", folder_key, file_type, file_extension)
                     return
 

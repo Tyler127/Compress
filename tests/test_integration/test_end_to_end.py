@@ -81,7 +81,7 @@ class TestEndToEnd:
             try:
                 if original_exists(self):
                     return original_stat(self)
-            except:
+            except Exception:
                 pass
 
             # Otherwise use mock values
@@ -207,7 +207,7 @@ class TestEndToEnd:
             try:
                 if original_exists(self):
                     return original_stat(self)
-            except:
+            except Exception:
                 pass
 
             # Otherwise use mock values

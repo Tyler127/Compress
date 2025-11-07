@@ -3,9 +3,8 @@ Tests for compressy.core.media_compressor module.
 """
 
 import os
-import shutil
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -255,7 +254,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
 
             def mock_stat(self):
                 path_str = str(self)
@@ -320,7 +318,7 @@ class TestMediaCompressor:
             compressor = MediaCompressor(config)
 
             # No files to process, but backup should still be checked
-            result = compressor.compress()
+            compressor.compress()
 
             # BackupManager should be initialized
             mock_backup_class.assert_called_once()
@@ -362,7 +360,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
 
             def mock_stat(self):
                 path_str = str(self)
@@ -407,7 +404,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
 
             def mock_stat(self):
                 path_str = str(self)
@@ -501,7 +497,7 @@ class TestMediaCompressor:
                             if original_exists(self):
                                 original_unlink(self)
                             output_file_exists[0] = False
-                        except:
+                        except Exception:
                             pass
                 else:
                     original_unlink(self)
@@ -548,7 +544,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
             original_unlink = Path.unlink
 
             def mock_stat(self):
@@ -576,7 +571,7 @@ class TestMediaCompressor:
                     if temp_file_created[0]:
                         try:
                             temp_output_file.unlink()
-                        except:
+                        except Exception:
                             pass
                 else:
                     original_unlink(self)
@@ -607,7 +602,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
 
             def mock_stat(self):
                 path_str = str(self)
@@ -706,7 +700,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
 
             def mock_stat(self):
                 path_str = str(self)
@@ -769,7 +762,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
             original_unlink = Path.unlink
 
             unlink_called = [False]
@@ -795,7 +787,7 @@ class TestMediaCompressor:
                     if output_created[0]:
                         try:
                             output_file.unlink()
-                        except:
+                        except Exception:
                             pass
                 else:
                     original_unlink(self)
@@ -835,7 +827,6 @@ class TestMediaCompressor:
 
             # Store original methods
             original_stat = Path.stat
-            original_exists = Path.exists
             original_unlink = Path.unlink
 
             unlink_called = [False]
@@ -861,7 +852,7 @@ class TestMediaCompressor:
                     if output_created[0]:
                         try:
                             output_file.unlink()
-                        except:
+                        except Exception:
                             pass
                 else:
                     original_unlink(self)
