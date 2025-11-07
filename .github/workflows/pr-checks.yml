@@ -54,7 +54,9 @@ jobs:
           echo "Merge conflicts detected!"
           exit 1
         }
-        git merge --abort
+        if [ -f .git/MERGE_HEAD ]; then
+          git merge --abort
+        fi
     
     - name: Validate commit messages
       run: |
