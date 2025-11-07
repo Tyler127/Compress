@@ -223,7 +223,7 @@ def lint_with_pylint() -> str:
             "pylint",
             "compressy",
             "--disable=all",
-            "--enable=errors,unused-import,undefined-variable",
+            "--enable=E,F,unused-import,undefined-variable",
             "--max-line-length=120",
         ]
     )
