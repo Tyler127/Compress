@@ -15,27 +15,29 @@ jobs:
         fetch-depth: 0
     
     - name: Check PR title format
-      uses: amannn/action-semantic-pull-request@v5
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        types: |
-          feat
-          fix
-          docs
-          style
-          refactor
-          perf
-          test
-          chore
-          ci
-          build
-        requireScope: false
-        subjectPattern: ^(?![A-Z]).+$
-        subjectPatternError: |
-          The subject "{subject}" found in the pull request title "{title}"
-          didn't match the configured pattern. Please ensure that the subject
-          doesn't start with an uppercase character.
+      run: |
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        echo "Checking PR title: $PR_TITLE"
+        
+        # Check if PR title matches format: #NOISSUE - <title> or #60 - <title>
+        if [[ ! "$PR_TITLE" =~ ^#(NOISSUE|[0-9]+)\ -\ .+ ]]; then
+          echo "❌ Invalid PR title format!"
+          echo ""
+          echo "PR title must follow one of these formats:"
+          echo "  • #NOISSUE - <description>"
+          echo "  • #123 - <description>"
+          echo ""
+          echo "Examples:"
+          echo "  ✓ #NOISSUE - fix linting errors"
+          echo "  ✓ #60 - add user authentication"
+          echo "  ✗ fix linting errors (missing issue reference)"
+          echo "  ✗ #60 fix errors (missing dash separator)"
+          echo ""
+          echo "Current PR title: $PR_TITLE"
+          exit 1
+        fi
+        
+        echo "✓ PR title format is valid"
     
     - name: Check for large files
       run: |
