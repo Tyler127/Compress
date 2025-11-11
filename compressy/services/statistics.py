@@ -331,7 +331,6 @@ class StatisticsManager:
         self.statistics_dir = statistics_dir
         self.statistics_dir.mkdir(parents=True, exist_ok=True)
         self.cumulative_stats_file = self.statistics_dir / "statistics.json"
-        self.run_history_file = self.statistics_dir / "run_history.json"
         self.files_log_file = self.statistics_dir / "files.json"
 
     def load_cumulative_stats(self) -> Dict:
@@ -373,12 +372,13 @@ class StatisticsManager:
         try:
             with open(self.cumulative_stats_file, "r", encoding="utf-8") as f:
                 stats = json.load(f)
-                
+
                 # Ensure all required fields exist with defaults
+                # Replace None values and missing keys with defaults
                 for key, default_value in default_stats.items():
-                    if key not in stats:
+                    if key not in stats or stats[key] is None:
                         stats[key] = default_value
-                
+
                 return stats
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Warning: Error reading statistics file ({e}). Creating new file.")
@@ -455,55 +455,6 @@ class StatisticsManager:
             print(f"Warning: Permission denied when writing to {self.cumulative_stats_file}")
         except Exception as e:
             print(f"Warning: Error saving cumulative statistics ({e})")
-
-    def append_run_history(self, run_stats: Dict, cmd_args: Dict, run_uuid: str) -> None:
-        """
-        Append current run to run history JSON file.
-
-        Args:
-            run_stats: Statistics dictionary from current compression run
-            cmd_args: Command line arguments used for this run
-            run_uuid: Unique identifier for this compression run
-        """
-        try:
-            # Load existing history
-            history = self.load_run_history()
-
-            # Prepare run record
-            run_record = {
-                "run_id": run_uuid,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "source_folder": cmd_args.get("source_folder", "N/A"),
-                "files_processed": run_stats.get("processed", 0),
-                "files_skipped": run_stats.get("skipped", 0),
-                "files_errors": run_stats.get("errors", 0),
-                "space_saved_bytes": run_stats.get("space_saved", 0),
-                "videos_processed": run_stats.get("videos_processed", 0),
-                "images_processed": run_stats.get("images_processed", 0),
-                "videos_original_size_bytes": run_stats.get("videos_original_size", 0),
-                "videos_compressed_size_bytes": run_stats.get("videos_compressed_size", 0),
-                "videos_space_saved_bytes": run_stats.get("videos_space_saved", 0),
-                "images_original_size_bytes": run_stats.get("images_original_size", 0),
-                "images_compressed_size_bytes": run_stats.get("images_compressed_size", 0),
-                "images_space_saved_bytes": run_stats.get("images_space_saved", 0),
-                "format_stats": run_stats.get("format_stats", {}),
-                "processing_time_seconds": run_stats.get("total_processing_time", 0.0),
-                "video_crf": cmd_args.get("video_crf"),
-                "image_quality": cmd_args.get("image_quality"),
-                "recursive": cmd_args.get("recursive", False),
-                "overwrite": cmd_args.get("overwrite", False),
-            }
-
-            # Append new record
-            history.append(run_record)
-
-            # Save updated history
-            with open(self.run_history_file, "w", encoding="utf-8") as f:
-                json.dump(history, f, indent=2)
-        except PermissionError:
-            print(f"Warning: Permission denied when writing to {self.run_history_file}")
-        except Exception as e:
-            print(f"Warning: Error saving run history ({e})")
 
     def print_stats(self) -> None:
         """Print cumulative statistics in a nice format."""
@@ -632,51 +583,57 @@ class StatisticsManager:
 
         print("=" * 60)
 
-    def load_run_history(self) -> List[Dict]:
-        """
-        Load run history from JSON file.
-
-        Returns:
-            List of dictionaries containing run history records
-        """
-        if not self.run_history_file.exists():
-            return []
-
-        try:
-            with open(self.run_history_file, "r", encoding="utf-8") as f:
-                runs = json.load(f)
-            return runs if isinstance(runs, list) else []
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"Warning: Error reading run history ({e})")
-            return []
-        except Exception as e:
-            print(f"Warning: Error reading run history ({e})")
-            return []
-
     def print_history(self, limit: Optional[int] = None) -> None:
         """
-        Print run history in a nice format.
+        Print run history in a nice format from files.json.
 
         Args:
             limit: Maximum number of runs to display (None for all)
         """
-        runs = self.load_run_history()
+        files_log = self.load_files_log()
 
-        if not runs:
+        if not files_log:
             print("\n" + "=" * 60)
             print("No Run History Available")
             print("=" * 60)
             print("Run history will be created after your first compression run.")
             return
 
-        # Reverse to show most recent first
-        runs.reverse()
+        # Convert to list and sort by timestamp (most recent first)
+        runs = []
+        for timestamp, entry in files_log.items():
+            metadata = entry.get("metadata", {})
+            run_data = {
+                "timestamp": timestamp,
+                "run_id": metadata.get("run_uuid", "N/A"),
+                "source_folder": metadata.get("source_folder", "N/A"),
+                "command": metadata.get("command"),
+                "video_crf": metadata.get("video_crf"),
+                "image_quality": metadata.get("image_quality"),
+                "recursive": metadata.get("recursive", False),
+                "overwrite": metadata.get("overwrite", False),
+            }
+            # Add stats if available
+            stats = entry.get("stats", {})
+            run_data.update(
+                {
+                    "files_processed": stats.get("files_processed", 0),
+                    "files_skipped": stats.get("files_skipped", 0),
+                    "files_errors": stats.get("files_errors", 0),
+                    "space_saved_bytes": stats.get("space_saved_bytes", 0),
+                    "processing_time_seconds": stats.get("processing_time_seconds", 0.0),
+                }
+            )
+            runs.append(run_data)
+
+        # Sort by timestamp (most recent first)
+        runs.sort(key=lambda x: x["timestamp"], reverse=True)
 
         if limit:
             runs = runs[:limit]
 
         print("\n" + "=" * 60)
-        print(f"Run History ({len(runs)} of {len(self.load_run_history())} runs shown)")
+        print(f"Run History ({len(runs)} of {len(files_log)} runs shown)")
         print("=" * 60)
 
         for idx, run in enumerate(runs, 1):
@@ -714,30 +671,78 @@ class StatisticsManager:
                 f"Overwrite={run.get('overwrite', False)}"
             )
 
+            # Print command if available
+            command = run.get("command", None)
+            if command and command != "N/A":
+                print(f"  Command: {command}")
+
         print("\n" + "=" * 60)
 
-    def load_files_log(self) -> List[Dict]:
+    def load_files_log(self) -> Dict[str, Dict]:  # noqa: C901
         """
         Load complete file processing history from files.json.
 
         Returns:
-            List of dictionaries containing file processing records
+            Dictionary keyed by timestamp, each containing run_uuid and files array
         """
         if not self.files_log_file.exists():
-            return []
+            return {}
 
         try:
             with open(self.files_log_file, "r", encoding="utf-8") as f:
-                files = json.load(f)
-            return files if isinstance(files, list) else []
+                files_log = json.load(f)
+            # Handle both old format (list) and new format (dict)
+            if isinstance(files_log, list):
+                # Convert old format (list) to new format (dict)
+                converted = {}
+                for file_record in files_log:
+                    timestamp = file_record.get("timestamp", "")
+                    run_id = file_record.get("run_id", "")
+                    if timestamp not in converted:
+                        converted[timestamp] = {"run_uuid": run_id, "files": []}
+                    # Remove timestamp and run_id from file record
+                    file_record_copy = {k: v for k, v in file_record.items() if k not in ("timestamp", "run_id")}
+                    converted[timestamp]["files"].append(file_record_copy)
+                return converted
+
+            # Handle old format with timestamp_run_uuid keys - convert to timestamp-only keys
+            if isinstance(files_log, dict):
+                converted = {}
+                for key, value in files_log.items():
+                    # Check if key contains underscore (old format: timestamp_uuid)
+                    if "_" in key and isinstance(value, dict) and "run_uuid" in value:
+                        # Extract timestamp (everything before the last underscore)
+                        # But actually, we want to split on the first underscore after the timestamp
+                        # Timestamp format is "YYYY-MM-DD HH:MM:SS", so we split on the first underscore after the space
+                        parts = key.split("_", 1)
+                        if len(parts) == 2:
+                            timestamp = parts[0]
+                            # If timestamp already exists, merge files (multiple runs at same timestamp)
+                            if timestamp in converted:
+                                converted[timestamp]["files"].extend(value.get("files", []))
+                            else:
+                                converted[timestamp] = value
+                        else:
+                            # Fallback: use key as-is if we can't parse it
+                            # This branch is unreachable: split("_", 1) always returns 2 elements if "_" is in key
+                            converted[key] = value  # pragma: no cover
+                    else:
+                        # Already in new format (timestamp-only key)
+                        converted[key] = value
+                return converted
+
+            # This return is unreachable: json.load() always returns dict or list (or raises)
+            return {}  # pragma: no cover
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Warning: Error reading files log ({e})")
-            return []
+            return {}
         except Exception as e:
             print(f"Warning: Error reading files log ({e})")
-            return []
+            return {}
 
-    def append_to_files_log(self, files_data: List[Dict], run_uuid: str, cmd_args: Dict) -> None:
+    def append_to_files_log(  # noqa: C901
+        self, files_data: List[Dict], run_uuid: str, cmd_args: Dict, run_stats: Dict = None, command: str = None
+    ) -> None:
         """
         Append files from current run to files.json.
 
@@ -745,6 +750,8 @@ class StatisticsManager:
             files_data: List of file info dictionaries from current run
             run_uuid: Unique identifier for this compression run
             cmd_args: Command line arguments used for this run
+            run_stats: Statistics dictionary from current compression run (optional)
+            command: Exact command string used to run compressy (optional)
         """
         try:
             # Load existing files log
@@ -752,40 +759,97 @@ class StatisticsManager:
 
             # Process each file and add to log
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
+            # Use timestamp as key (if multiple runs happen at same timestamp, they'll be grouped together)
+            # Initialize run entry if it doesn't exist
+            if timestamp not in files_log:
+                files_log[timestamp] = {"metadata": {}, "stats": {}, "files": []}
+
+            # Add run metadata (all command arguments and run info)
+            metadata = {
+                "run_uuid": run_uuid,
+            }
+            if command:
+                metadata["command"] = command
+
+            # Add all command arguments to metadata
+            for key, value in cmd_args.items():
+                if value is not None:
+                    metadata[key] = value
+
+            files_log[timestamp]["metadata"] = metadata
+
+            # Add stats if provided (only statistical data, no metadata)
+            if run_stats is not None:
+                stats = {
+                    "files_processed": run_stats.get("processed", 0),
+                    "files_skipped": run_stats.get("skipped", 0),
+                    "files_errors": run_stats.get("errors", 0),
+                    "space_saved_bytes": run_stats.get("space_saved", 0),
+                    "videos_processed": run_stats.get("videos_processed", 0),
+                    "images_processed": run_stats.get("images_processed", 0),
+                    "videos_original_size_bytes": run_stats.get("videos_original_size", 0),
+                    "videos_compressed_size_bytes": run_stats.get("videos_compressed_size", 0),
+                    "videos_space_saved_bytes": run_stats.get("videos_space_saved", 0),
+                    "images_original_size_bytes": run_stats.get("images_original_size", 0),
+                    "images_compressed_size_bytes": run_stats.get("images_compressed_size", 0),
+                    "images_space_saved_bytes": run_stats.get("images_space_saved", 0),
+                    "format_stats": run_stats.get("format_stats", {}),
+                    "processing_time_seconds": run_stats.get("total_processing_time", 0.0),
+                }
+                files_log[timestamp]["stats"] = stats
+
+            # Process all files for this run
+            run_files = []
             for file_info in files_data:
                 # Extract file type and format from name
                 file_name = file_info.get("name", "")
                 file_extension = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
-                
+
                 # Determine file type based on extension
                 video_extensions = ["mp4", "avi", "mov", "mkv", "flv", "wmv", "webm", "m4v"]
                 image_extensions = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "svg"]
-                
+
                 if file_extension in video_extensions:
                     file_type = "video"
                 elif file_extension in image_extensions:
                     file_type = "image"
                 else:
                     file_type = "unknown"
-                
-                # Create file record
+
+                # Build modifications dict - only include non-null values that were actually applied
+                modifications = {}
+
+                # Only include "compressed" if the file was actually compressed
+                if file_info.get("status") in ("success"):
+                    modifications["compressed"] = True
+
+                # Only include video-related modifications if it's a video and values are not None
+                if file_type == "video":
+                    if cmd_args.get("video_crf") is not None:
+                        modifications["video_crf"] = cmd_args.get("video_crf")
+                    if cmd_args.get("video_preset") is not None:
+                        modifications["video_preset"] = cmd_args.get("video_preset")
+                    if cmd_args.get("video_resize") is not None:
+                        modifications["video_resize"] = cmd_args.get("video_resize")
+                    if cmd_args.get("video_resolution") is not None:
+                        modifications["video_resolution"] = cmd_args.get("video_resolution")
+
+                # Only include image-related modifications if it's an image and values are not None
+                if file_type == "image":
+                    if cmd_args.get("image_quality") is not None:
+                        modifications["image_quality"] = cmd_args.get("image_quality")
+                    if cmd_args.get("image_resize") is not None:
+                        modifications["image_resize"] = cmd_args.get("image_resize")
+
+                # Create file record (without timestamp and run_id)
                 file_record = {
-                    "timestamp": timestamp,
-                    "run_id": run_uuid,
                     "file_name": file_name,
                     "original_path": file_info.get("original_path", "N/A"),
                     "new_path": file_info.get("new_path", "N/A"),
                     "file_type": file_type,
                     "format": file_extension,
-                    "modifications": {
-                        "compressed": file_info.get("status") == "processed",
-                        "video_crf": cmd_args.get("video_crf") if file_type == "video" else None,
-                        "video_preset": cmd_args.get("video_preset") if file_type == "video" else None,
-                        "video_resize": cmd_args.get("video_resize") if file_type == "video" else None,
-                        "image_quality": cmd_args.get("image_quality") if file_type == "image" else None,
-                        "image_resize": cmd_args.get("image_resize") if file_type == "image" else None,
-                    },
+                    "modifications": modifications,
                     "size_before_bytes": file_info.get("original_size", 0),
                     "size_after_bytes": file_info.get("compressed_size", 0),
                     "space_saved_bytes": file_info.get("space_saved", 0),
@@ -793,8 +857,11 @@ class StatisticsManager:
                     "processing_time_seconds": file_info.get("processing_time", 0.0),
                     "status": file_info.get("status", "unknown"),
                 }
-                
-                files_log.append(file_record)
+
+                run_files.append(file_record)
+
+            # Add all files to the run entry
+            files_log[timestamp]["files"].extend(run_files)
 
             # Save updated files log
             with open(self.files_log_file, "w", encoding="utf-8") as f:

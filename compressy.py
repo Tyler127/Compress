@@ -1,4 +1,6 @@
 import argparse
+import shlex
+import sys
 import uuid
 from pathlib import Path
 from compressy.core.config import CompressionConfig
@@ -137,6 +139,17 @@ def main():
     
     args = parser.parse_args()
     
+    # Build command string from sys.argv for logging (only for compression runs, not view commands)
+    def build_command_string():
+        """Reconstruct the command string from sys.argv."""        
+        # Use sys.argv but replace the script name with the actual script name
+        cmd_parts = list(sys.argv)
+        # Replace first argument (script path) with just the script name for cleaner output
+        if cmd_parts:
+            cmd_parts[0] = Path(__file__).name
+        
+        return " ".join(shlex.quote(arg) if " " in arg or any(c in arg for c in "&|<>()") else arg for arg in cmd_parts)
+    
     # Handle view commands early (don't require source_folder)
     if args.view_stats or args.view_history is not None:
         script_dir = Path(__file__).resolve().parent
@@ -234,8 +247,9 @@ def main():
             statistics_dir = script_dir / "statistics"
             stats_manager = StatisticsManager(statistics_dir)
             stats_manager.update_cumulative_stats(stats)
-            stats_manager.append_run_history(stats, cmd_args, run_uuid)
-            stats_manager.append_to_files_log(stats.get('files', []), run_uuid, cmd_args)
+            # Build command string for logging
+            command_string = build_command_string()
+            stats_manager.append_to_files_log(stats.get('files', []), run_uuid, cmd_args, stats, command_string)
             print(f"Statistics updated: {statistics_dir}")
         except Exception as e:
             import traceback

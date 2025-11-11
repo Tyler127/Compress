@@ -3,8 +3,7 @@ Tests for compressy.services.reports module.
 """
 
 import json
-from pathlib import Path
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -138,7 +137,7 @@ class TestReportGenerator:
         assert report_path.exists()
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert "metadata" in report
         assert "Test Report" in report["metadata"]["title"]
         assert report["metadata"]["run_id"] == "test-uuid"
@@ -176,7 +175,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert "file_details" in report
         assert len(report["file_details"]) == 1
         assert report["file_details"][0]["name"] == "test1.mp4"
@@ -210,7 +209,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert "arguments" in report
         assert report["arguments"]["source_folder"] == "/test/folder"
         assert report["arguments"]["video_crf"] == 23
@@ -381,7 +380,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert "processing_time" in report
         assert report["processing_time"]["total_seconds"] == 3661.5
         assert "1h" in report["processing_time"]["formatted"]
@@ -408,7 +407,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert "2m" in report["processing_time"]["formatted"]
         assert "5.5s" in report["processing_time"]["formatted"]
 
@@ -433,7 +432,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert "45.7s" in report["processing_time"]["formatted"]
 
     def test_write_json_report_includes_image_resize(self, temp_dir):
@@ -458,7 +457,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert report["arguments"]["image_resize"] == 75
 
     def test_write_json_report_includes_ffmpeg_path(self, temp_dir):
@@ -483,7 +482,7 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert report["arguments"]["ffmpeg_path"] == "/usr/bin/ffmpeg"
 
     def test_write_json_report_includes_backup_dir(self, temp_dir):
@@ -508,5 +507,5 @@ class TestReportGenerator:
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
-        
+
         assert report["arguments"]["backup_dir"] == "/backup/path"

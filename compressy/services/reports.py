@@ -4,8 +4,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from compressy.utils.format import format_size
-
 
 # ============================================================================
 # Report Generator
@@ -229,7 +227,7 @@ class ReportGenerator:
                 time_str = f"{minutes}m {seconds:.1f}s"
             else:
                 time_str = f"{seconds:.1f}s"
-        
+
         processing_time = {
             "total_seconds": total_time,
             "formatted": time_str,
@@ -238,15 +236,17 @@ class ReportGenerator:
         # Build file details section
         file_details = []
         for file_info in report_stats.get("files", []):
-            file_details.append({
-                "name": file_info["name"],
-                "original_size_bytes": file_info["original_size"],
-                "compressed_size_bytes": file_info["compressed_size"],
-                "space_saved_bytes": file_info["space_saved"],
-                "compression_ratio_percent": round(file_info["compression_ratio"], 2),
-                "processing_time_seconds": round(file_info.get("processing_time", 0), 2),
-                "status": file_info["status"],
-            })
+            file_details.append(
+                {
+                    "name": file_info["name"],
+                    "original_size_bytes": file_info["original_size"],
+                    "compressed_size_bytes": file_info["compressed_size"],
+                    "space_saved_bytes": file_info["space_saved"],
+                    "compression_ratio_percent": round(file_info["compression_ratio"], 2),
+                    "processing_time_seconds": round(file_info.get("processing_time", 0), 2),
+                    "status": file_info["status"],
+                }
+            )
 
         # Build arguments section
         arguments = {}
