@@ -127,124 +127,160 @@ class StatisticsTracker:
             file_type: File type ("video" or "image")
             file_extension: File extension without dot (e.g., "mp4", "jpg")
         """
-        # Update format stats if extension provided
-        if file_extension:
-            self._initialize_format_stats(self.stats["format_stats"], file_extension)
-            format_stat = self.stats["format_stats"][file_extension]
-
-            if status == "processed":
-                format_stat["count"] += 1
-                format_stat["original_size"] += original_size
-                format_stat["compressed_size"] += compressed_size
-                format_stat["space_saved"] += space_saved
-            elif status == "skipped":
-                format_stat["count"] += 1
-                format_stat["original_size"] += original_size
-                format_stat["compressed_size"] += compressed_size
-            # Note: errors don't add to format stats
+        if status in {"processed", "skipped"}:
+            self._apply_format_stats(
+                status,
+                file_extension,
+                original_size,
+                compressed_size,
+                space_saved,
+                folder_key,
+            )
 
         if status == "processed":
-            self.stats["processed"] += 1
-            self.stats["total_compressed_size"] += compressed_size
-            self.stats["space_saved"] += space_saved
-
-            # Update type-level stats
-            if file_type == "video":
-                self.stats["videos_processed"] += 1
-                self.stats["videos_original_size"] += original_size
-                self.stats["videos_compressed_size"] += compressed_size
-                self.stats["videos_space_saved"] += space_saved
-            elif file_type == "image":
-                self.stats["images_processed"] += 1
-                self.stats["images_original_size"] += original_size
-                self.stats["images_compressed_size"] += compressed_size
-                self.stats["images_space_saved"] += space_saved
-
-            if self.recursive:
-                self.initialize_folder_stats(folder_key)
-                folder_stat = self.stats["folder_stats"][folder_key]
-                folder_stat["processed"] += 1
-                folder_stat["total_compressed_size"] += compressed_size
-                folder_stat["space_saved"] += space_saved
-
-                # Update type-level stats for folder
-                if file_type == "video":
-                    folder_stat["videos_processed"] += 1
-                    folder_stat["videos_original_size"] += original_size
-                    folder_stat["videos_compressed_size"] += compressed_size
-                    folder_stat["videos_space_saved"] += space_saved
-                elif file_type == "image":
-                    folder_stat["images_processed"] += 1
-                    folder_stat["images_original_size"] += original_size
-                    folder_stat["images_compressed_size"] += compressed_size
-                    folder_stat["images_space_saved"] += space_saved
-
-                # Update format stats for folder
-                if file_extension:
-                    self._initialize_format_stats(folder_stat["format_stats"], file_extension)
-                    folder_format_stat = folder_stat["format_stats"][file_extension]
-                    folder_format_stat["count"] += 1
-                    folder_format_stat["original_size"] += original_size
-                    folder_format_stat["compressed_size"] += compressed_size
-                    folder_format_stat["space_saved"] += space_saved
-
+            self._record_processed(
+                original_size,
+                compressed_size,
+                space_saved,
+                folder_key,
+                file_type,
+                file_extension,
+            )
         elif status == "skipped":
-            self.stats["skipped"] += 1
-            self.stats["total_compressed_size"] += compressed_size
-
-            # Update type-level stats
-            if file_type == "video":
-                self.stats["videos_skipped"] += 1
-                self.stats["videos_original_size"] += original_size
-                self.stats["videos_compressed_size"] += compressed_size
-            elif file_type == "image":
-                self.stats["images_skipped"] += 1
-                self.stats["images_original_size"] += original_size
-                self.stats["images_compressed_size"] += compressed_size
-
-            if self.recursive:
-                self.initialize_folder_stats(folder_key)
-                folder_stat = self.stats["folder_stats"][folder_key]
-                folder_stat["skipped"] += 1
-                folder_stat["total_compressed_size"] += compressed_size
-
-                # Update type-level stats for folder
-                if file_type == "video":
-                    folder_stat["videos_skipped"] += 1
-                    folder_stat["videos_original_size"] += original_size
-                    folder_stat["videos_compressed_size"] += compressed_size
-                elif file_type == "image":
-                    folder_stat["images_skipped"] += 1
-                    folder_stat["images_original_size"] += original_size
-                    folder_stat["images_compressed_size"] += compressed_size
-
-                # Update format stats for folder
-                if file_extension:
-                    self._initialize_format_stats(folder_stat["format_stats"], file_extension)
-                    folder_format_stat = folder_stat["format_stats"][file_extension]
-                    folder_format_stat["count"] += 1
-                    folder_format_stat["original_size"] += original_size
-                    folder_format_stat["compressed_size"] += compressed_size
-
+            self._record_skipped(
+                original_size,
+                compressed_size,
+                folder_key,
+                file_type,
+            )
         elif status == "error":
-            self.stats["errors"] += 1
+            self._record_error(folder_key, file_type)
 
-            # Update type-level stats
-            if file_type == "video":
-                self.stats["videos_errors"] += 1
-            elif file_type == "image":
-                self.stats["images_errors"] += 1
+    def _apply_format_stats(
+        self,
+        status: str,
+        file_extension: Optional[str],
+        original_size: int,
+        compressed_size: int,
+        space_saved: int,
+        folder_key: str,
+    ) -> None:
+        if not file_extension:
+            return
 
-            if self.recursive:
-                self.initialize_folder_stats(folder_key)
-                folder_stat = self.stats["folder_stats"][folder_key]
-                folder_stat["errors"] += 1
+        self._update_format_stats_for_container(
+            self.stats,
+            file_extension,
+            status,
+            original_size,
+            compressed_size,
+            space_saved,
+        )
 
-                # Update type-level stats for folder
-                if file_type == "video":
-                    folder_stat["videos_errors"] += 1
-                elif file_type == "image":
-                    folder_stat["images_errors"] += 1
+        if self.recursive:
+            folder_stat = self._get_folder_stats(folder_key)
+            self._update_format_stats_for_container(
+                folder_stat,
+                file_extension,
+                status,
+                original_size,
+                compressed_size,
+                space_saved,
+            )
+
+    def _update_format_stats_for_container(
+        self,
+        container: Dict,
+        file_extension: str,
+        status: str,
+        original_size: int,
+        compressed_size: int,
+        space_saved: int,
+    ) -> None:
+        self._initialize_format_stats(container["format_stats"], file_extension)
+        stats = container["format_stats"][file_extension]
+        stats["count"] += 1
+        stats["original_size"] += original_size
+        stats["compressed_size"] += compressed_size
+        if status == "processed":
+            stats["space_saved"] += space_saved
+
+    def _record_processed(
+        self,
+        original_size: int,
+        compressed_size: int,
+        space_saved: int,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+    ) -> None:
+        self.stats["processed"] += 1
+        self.stats["total_compressed_size"] += compressed_size
+        self.stats["space_saved"] += space_saved
+        self._update_type_totals(self.stats, file_type, "processed", original_size, compressed_size, space_saved)
+
+        if self.recursive:
+            folder_stat = self._get_folder_stats(folder_key)
+            folder_stat["processed"] += 1
+            folder_stat["total_compressed_size"] += compressed_size
+            folder_stat["space_saved"] += space_saved
+            self._update_type_totals(folder_stat, file_type, "processed", original_size, compressed_size, space_saved)
+
+    def _record_skipped(
+        self,
+        original_size: int,
+        compressed_size: int,
+        folder_key: str,
+        file_type: Optional[str],
+    ) -> None:
+        self.stats["skipped"] += 1
+        self.stats["total_compressed_size"] += compressed_size
+        self._update_type_totals(self.stats, file_type, "skipped", original_size, compressed_size, 0)
+
+        if self.recursive:
+            folder_stat = self._get_folder_stats(folder_key)
+            folder_stat["skipped"] += 1
+            folder_stat["total_compressed_size"] += compressed_size
+            self._update_type_totals(folder_stat, file_type, "skipped", original_size, compressed_size, 0)
+
+    def _record_error(self, folder_key: str, file_type: Optional[str]) -> None:
+        self.stats["errors"] += 1
+        self._update_type_totals(self.stats, file_type, "error", 0, 0, 0)
+
+        if self.recursive:
+            folder_stat = self._get_folder_stats(folder_key)
+            folder_stat["errors"] += 1
+            self._update_type_totals(folder_stat, file_type, "error", 0, 0, 0)
+
+    def _update_type_totals(
+        self,
+        container: Dict,
+        file_type: Optional[str],
+        status: str,
+        original_size: int,
+        compressed_size: int,
+        space_saved: int,
+    ) -> None:
+        if file_type not in {"video", "image"}:
+            return
+
+        prefix = "videos" if file_type == "video" else "images"
+
+        if status == "processed":
+            container[f"{prefix}_processed"] += 1
+            container[f"{prefix}_original_size"] += original_size
+            container[f"{prefix}_compressed_size"] += compressed_size
+            container[f"{prefix}_space_saved"] += space_saved
+        elif status == "skipped":
+            container[f"{prefix}_skipped"] += 1
+            container[f"{prefix}_original_size"] += original_size
+            container[f"{prefix}_compressed_size"] += compressed_size
+        elif status == "error":
+            container[f"{prefix}_errors"] += 1
+
+    def _get_folder_stats(self, folder_key: str) -> Dict:
+        self.initialize_folder_stats(folder_key)
+        return self.stats["folder_stats"][folder_key]
 
     def add_total_file(self, original_size: int, folder_key: str = "root") -> None:
         """Add a file to total count."""
@@ -570,13 +606,23 @@ class StatisticsManager:
         print("=" * 60)
         print(f"Total Runs: {stats['total_runs']}")
         print(f"Last Updated: {stats['last_updated'] or 'N/A'}")
+
+        self._print_file_statistics(stats)
+        self._print_type_breakdown(stats)
+        self._print_size_statistics(stats)
+        self._print_size_by_type(stats)
+        self._print_format_breakdown(stats)
+
+        print("=" * 60)
+
+    def _print_file_statistics(self, stats: Dict) -> None:
         print()
         print("File Statistics:")
         print(f"  Processed: {stats['total_files_processed']:,} files")
         print(f"  Skipped: {stats['total_files_skipped']:,} files")
         print(f"  Errors: {stats['total_files_errors']:,} files")
 
-        # Type-level breakdown (only show if > 0)
+    def _print_type_breakdown(self, stats: Dict) -> None:
         videos_processed = stats.get("total_videos_processed", 0)
         images_processed = stats.get("total_images_processed", 0)
         videos_skipped = stats.get("total_videos_skipped", 0)
@@ -584,14 +630,17 @@ class StatisticsManager:
         videos_errors = stats.get("total_videos_errors", 0)
         images_errors = stats.get("total_images_errors", 0)
 
-        if videos_processed > 0 or images_processed > 0:
-            print()
-            print("By Type:")
-            if videos_processed > 0 or videos_skipped > 0 or videos_errors > 0:
-                print(f"  Videos: {videos_processed:,} processed, {videos_skipped:,} skipped, {videos_errors:,} errors")
-            if images_processed > 0 or images_skipped > 0 or images_errors > 0:
-                print(f"  Images: {images_processed:,} processed, {images_skipped:,} skipped, {images_errors:,} errors")
+        if videos_processed == 0 and images_processed == 0:
+            return
 
+        print()
+        print("By Type:")
+        if videos_processed > 0 or videos_skipped > 0 or videos_errors > 0:
+            print(f"  Videos: {videos_processed:,} processed, {videos_skipped:,} skipped, {videos_errors:,} errors")
+        if images_processed > 0 or images_skipped > 0 or images_errors > 0:
+            print(f"  Images: {images_processed:,} processed, {images_skipped:,} skipped, {images_errors:,} errors")
+
+    def _print_size_statistics(self, stats: Dict) -> None:
         print()
         print("Size Statistics:")
         original_size = stats["total_original_size_bytes"]
@@ -606,7 +655,7 @@ class StatisticsManager:
             compression_ratio = (space_saved / original_size) * 100
             print(f"  Overall Compression: {compression_ratio:.2f}%")
 
-        # Type-level size breakdown (only show if > 0)
+    def _print_size_by_type(self, stats: Dict) -> None:
         videos_original = stats.get("total_videos_original_size_bytes", 0)
         videos_compressed = stats.get("total_videos_compressed_size_bytes", 0)
         videos_space_saved = stats.get("total_videos_space_saved_bytes", 0)
@@ -614,57 +663,61 @@ class StatisticsManager:
         images_compressed = stats.get("total_images_compressed_size_bytes", 0)
         images_space_saved = stats.get("total_images_space_saved_bytes", 0)
 
-        if videos_original > 0 or images_original > 0:
-            print()
-            print("Size by Type:")
+        if videos_original == 0 and images_original == 0:
+            return
+
+        print()
+        print("Size by Type:")
+        if videos_original > 0:
+            print(
+                f"  Videos: {format_size(videos_original)} → {format_size(videos_compressed)} "
+                f"({format_size(videos_space_saved)} saved)"
+            )
             if videos_original > 0:
-                print(
-                    f"  Videos: {format_size(videos_original)} → {format_size(videos_compressed)} "
-                    f"({format_size(videos_space_saved)} saved)"
-                )
-                if videos_original > 0:
-                    video_ratio = (videos_space_saved / videos_original) * 100
-                    print(f"    Compression: {video_ratio:.2f}%")
+                video_ratio = (videos_space_saved / videos_original) * 100
+                print(f"    Compression: {video_ratio:.2f}%")
+        if images_original > 0:
+            print(
+                f"  Images: {format_size(images_original)} → {format_size(images_compressed)} "
+                f"({format_size(images_space_saved)} saved)"
+            )
             if images_original > 0:
-                print(
-                    f"  Images: {format_size(images_original)} → {format_size(images_compressed)} "
-                    f"({format_size(images_space_saved)} saved)"
-                )
-                if images_original > 0:
-                    image_ratio = (images_space_saved / images_original) * 100
-                    print(f"    Compression: {image_ratio:.2f}%")
+                image_ratio = (images_space_saved / images_original) * 100
+                print(f"    Compression: {image_ratio:.2f}%")
 
-        # Format-level breakdown (only show formats with count > 0)
-        format_stats_json = stats.get("format_stats_json", "{}")
+    def _print_format_breakdown(self, stats: Dict) -> None:
+        format_stats = self._load_format_stats(stats.get("format_stats_json", "{}"))
+        if not format_stats:
+            return
+
+        sorted_formats = sorted(format_stats.items(), key=lambda x: x[1].get("count", 0), reverse=True)
+        formats_to_show = [(ext, data) for ext, data in sorted_formats if data.get("count", 0) > 0]
+
+        if not formats_to_show:
+            return
+
+        print()
+        print("By Format:")
+        for format_ext, format_data in formats_to_show:
+            count = format_data.get("count", 0)
+            orig_size = format_data.get("original_size", 0)
+            comp_size = format_data.get("compressed_size", 0)
+            saved = format_data.get("space_saved", 0)
+            print(
+                f"  .{format_ext.upper()}: {count:,} files, "
+                f"{format_size(orig_size)} → {format_size(comp_size)} "
+                f"({format_size(saved)} saved)"
+            )
+            if orig_size > 0:
+                format_ratio = (saved / orig_size) * 100
+                print(f"    Compression: {format_ratio:.2f}%")
+
+    @staticmethod
+    def _load_format_stats(format_stats_json: str) -> Dict[str, Dict]:
         try:
-            format_stats = json.loads(format_stats_json) if format_stats_json else {}
-            if format_stats:
-                # Sort formats by count (descending)
-                sorted_formats = sorted(format_stats.items(), key=lambda x: x[1].get("count", 0), reverse=True)
-                # Only show formats with count > 0
-                formats_to_show = [(ext, data) for ext, data in sorted_formats if data.get("count", 0) > 0]
-
-                if formats_to_show:
-                    print()
-                    print("By Format:")
-                    for format_ext, format_data in formats_to_show:
-                        count = format_data.get("count", 0)
-                        orig_size = format_data.get("original_size", 0)
-                        comp_size = format_data.get("compressed_size", 0)
-                        saved = format_data.get("space_saved", 0)
-                        print(
-                            f"  .{format_ext.upper()}: {count:,} files, "
-                            f"{format_size(orig_size)} → {format_size(comp_size)} "
-                            f"({format_size(saved)} saved)"
-                        )
-                        if orig_size > 0:
-                            format_ratio = (saved / orig_size) * 100
-                            print(f"    Compression: {format_ratio:.2f}%")
+            return json.loads(format_stats_json) if format_stats_json else {}
         except (json.JSONDecodeError, TypeError):
-            # If format_stats_json is invalid, just skip it
-            pass
-
-        print("=" * 60)
+            return {}
 
     def load_run_history(self) -> List[Dict]:
         """

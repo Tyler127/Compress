@@ -157,6 +157,11 @@ class TestParseSize:
         with pytest.raises(ValueError, match="Invalid size format"):
             parse_size("MB10")
 
+    def test_parse_invalid_numeric_value(self):
+        """Test that invalid numeric values raise ValueError after regex match."""
+        with pytest.raises(ValueError, match="Invalid numeric value"):
+            parse_size("1..5MB")
+
     def test_parse_negative_size(self):
         """Test that negative sizes raise ValueError."""
         with pytest.raises(ValueError, match="Size cannot be negative"):
@@ -173,6 +178,22 @@ class TestParseSize:
         """Test that None raises ValueError."""
         with pytest.raises(ValueError, match="Invalid size string"):
             parse_size(None)
+
+    def test_parse_invalid_unit_after_match(self, monkeypatch):
+        """Test that parse_size raises for unsupported units even when regex matches."""
+
+        class DummyMatch:
+            def group(self, index):
+                if index == 1:
+                    return "10"
+                if index == 2:
+                    return "QB"
+                raise AssertionError("Unexpected group index")
+
+        monkeypatch.setattr("compressy.utils.format.re.match", lambda *args, **kwargs: DummyMatch())
+
+        with pytest.raises(ValueError, match="Invalid size unit"):
+            parse_size("10QB")
 
     def test_parse_edge_cases(self):
         """Test edge cases."""

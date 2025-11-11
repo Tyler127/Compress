@@ -294,3 +294,33 @@ class TestFFmpegExecutor:
         result = executor.run_with_progress(["-i", "input.mp4", "output.mp4"], progress_interval=5.0)
 
         assert result.returncode == 0
+
+    def test_maybe_print_progress_without_data(self):
+        """Test that _maybe_print_progress returns original timestamp when no progress parsed."""
+        executor = FFmpegExecutor(ffmpeg_path="/fake/ffmpeg")
+
+        with patch("builtins.print") as mock_print:
+            last_update = executor._maybe_print_progress("no progress info", last_update=1.0, interval=5.0)
+
+        assert last_update == 1.0
+        mock_print.assert_not_called()
+
+    def test_maybe_print_progress_throttles_updates(self):
+        """Test that _maybe_print_progress throttles updates when interval not reached."""
+        executor = FFmpegExecutor(ffmpeg_path="/fake/ffmpeg")
+
+        with patch("compressy.core.ffmpeg_executor.time.time", return_value=2.0), patch("builtins.print") as mock_print:
+            last_update = executor._maybe_print_progress(
+                "frame=  10 fps=25.0 time=00:00:01.00", last_update=1.5, interval=5.0
+            )
+
+        assert last_update == 1.5
+        mock_print.assert_not_called()
+
+    def test_format_progress_without_segments(self):
+        """Test that _format_progress returns placeholder when no known segments exist."""
+        executor = FFmpegExecutor(ffmpeg_path="/fake/ffmpeg")
+
+        formatted = executor._format_progress({})
+
+        assert formatted == "  [Progress]"

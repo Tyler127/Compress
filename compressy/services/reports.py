@@ -183,102 +183,105 @@ class ReportGenerator:
         with open(unique_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
-            # Write summary and statistics as comment rows
-            writer.writerow([f"# Compression Report: {report_title}"])
-            if parent_folder:
-                writer.writerow([f"# Parent Folder: {parent_folder}"])
-            writer.writerow([f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
-            writer.writerow([])
+            self._write_report_header(writer, report_title, parent_folder)
+            self._write_summary_section(writer, report_stats)
+            self._write_size_statistics(writer, report_stats)
+            self._write_processing_time(writer, report_stats)
+            self._write_file_details(writer, report_stats)
+            self._write_arguments_section(writer, cmd_args)
 
-            # Summary section
-            writer.writerow(["# Summary"])
-            writer.writerow(["# Total Files Found", report_stats["total_files"]])
-            writer.writerow(["# Files Processed", report_stats["processed"]])
-            writer.writerow(["# Files Skipped", report_stats["skipped"]])
-            writer.writerow(["# Errors", report_stats["errors"]])
-            writer.writerow([])
+    def _write_report_header(self, writer: csv.writer, report_title: str, parent_folder: Optional[str]) -> None:
+        writer.writerow([f"# Compression Report: {report_title}"])
+        if parent_folder:
+            writer.writerow([f"# Parent Folder: {parent_folder}"])
+        writer.writerow([f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        writer.writerow([])
 
-            # Size Statistics section
-            total_compression_ratio = (
-                (report_stats["space_saved"] / report_stats["total_original_size"] * 100)
-                if report_stats["total_original_size"] > 0
-                else 0
-            )
-            writer.writerow(["# Size Statistics"])
+    def _write_summary_section(self, writer: csv.writer, report_stats: Dict) -> None:
+        writer.writerow(["# Summary"])
+        writer.writerow(["# Total Files Found", report_stats["total_files"]])
+        writer.writerow(["# Files Processed", report_stats["processed"]])
+        writer.writerow(["# Files Skipped", report_stats["skipped"]])
+        writer.writerow(["# Errors", report_stats["errors"]])
+        writer.writerow([])
+
+    def _write_size_statistics(self, writer: csv.writer, report_stats: Dict) -> None:
+        total_compression_ratio = (
+            (report_stats["space_saved"] / report_stats["total_original_size"] * 100)
+            if report_stats["total_original_size"] > 0
+            else 0
+        )
+        writer.writerow(["# Size Statistics"])
+        writer.writerow(["# Total Original Size", format_size(report_stats["total_original_size"])])
+        writer.writerow(["# Total Compressed Size", format_size(report_stats["total_compressed_size"])])
+        writer.writerow(["# Total Space Saved", format_size(report_stats["space_saved"])])
+        writer.writerow(["# Overall Compression Ratio", f"{total_compression_ratio:.2f}%"])
+
+    def _write_processing_time(self, writer: csv.writer, report_stats: Dict) -> None:
+        total_time = report_stats.get("total_processing_time", 0)
+        if total_time > 0:
+            writer.writerow(["# Total Processing Time", self._format_processing_time(total_time)])
+        writer.writerow([])
+
+    @staticmethod
+    def _format_processing_time(total_time: float) -> str:
+        hours = int(total_time // 3600)
+        minutes = int((total_time % 3600) // 60)
+        seconds = total_time % 60
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds:.1f}s"
+        if minutes > 0:
+            return f"{minutes}m {seconds:.1f}s"
+        return f"{seconds:.1f}s"
+
+    def _write_file_details(self, writer: csv.writer, report_stats: Dict) -> None:
+        if not report_stats["files"]:
+            return
+
+        writer.writerow(["# File Details"])
+        writer.writerow(
+            [
+                "Filename",
+                "Original Size",
+                "Compressed Size",
+                "Space Saved",
+                "Compression Ratio (%)",
+                "Processing Time (s)",
+                "Status",
+            ]
+        )
+
+        for file_info in report_stats["files"]:
+            processing_time = file_info.get("processing_time", 0)
             writer.writerow(
                 [
-                    "# Total Original Size",
-                    format_size(report_stats["total_original_size"]),
+                    file_info["name"],
+                    format_size(file_info["original_size"]),
+                    format_size(file_info["compressed_size"]),
+                    format_size(file_info["space_saved"]),
+                    f"{file_info['compression_ratio']:.2f}",
+                    f"{processing_time:.2f}",
+                    file_info["status"],
                 ]
             )
-            writer.writerow(
-                [
-                    "# Total Compressed Size",
-                    format_size(report_stats["total_compressed_size"]),
-                ]
-            )
-            writer.writerow(["# Total Space Saved", format_size(report_stats["space_saved"])])
-            writer.writerow(["# Overall Compression Ratio", f"{total_compression_ratio:.2f}%"])
+        writer.writerow([])
 
-            # Processing Time Statistics
-            total_time = report_stats.get("total_processing_time", 0)
-            if total_time > 0:
-                hours = int(total_time // 3600)
-                minutes = int((total_time % 3600) // 60)
-                seconds = total_time % 60
-                if hours > 0:
-                    time_str = f"{hours}h {minutes}m {seconds:.1f}s"
-                elif minutes > 0:
-                    time_str = f"{minutes}m {seconds:.1f}s"
-                else:
-                    time_str = f"{seconds:.1f}s"
-                writer.writerow(["# Total Processing Time", time_str])
-            writer.writerow([])
+    def _write_arguments_section(self, writer: csv.writer, cmd_args: Optional[Dict]) -> None:
+        if not cmd_args:
+            return
 
-            # File Details CSV section
-            if report_stats["files"]:
-                writer.writerow(["# File Details"])
-                writer.writerow(
-                    [
-                        "Filename",
-                        "Original Size",
-                        "Compressed Size",
-                        "Space Saved",
-                        "Compression Ratio (%)",
-                        "Processing Time (s)",
-                        "Status",
-                    ]
-                )
-
-                for file_info in report_stats["files"]:
-                    processing_time = file_info.get("processing_time", 0)
-                    writer.writerow(
-                        [
-                            file_info["name"],
-                            format_size(file_info["original_size"]),
-                            format_size(file_info["compressed_size"]),
-                            format_size(file_info["space_saved"]),
-                            f"{file_info['compression_ratio']:.2f}",
-                            f"{processing_time:.2f}",
-                            file_info["status"],
-                        ]
-                    )
-                writer.writerow([])
-
-            # Arguments section
-            if cmd_args:
-                writer.writerow(["# Arguments"])
-                writer.writerow(["# Source Folder", cmd_args.get("source_folder", "N/A")])
-                writer.writerow(["# Video CRF", cmd_args.get("video_crf", "N/A")])
-                writer.writerow(["# Video Preset", cmd_args.get("video_preset", "N/A")])
-                writer.writerow(["# Image Quality", cmd_args.get("image_quality", "N/A")])
-                if cmd_args.get("image_resize"):
-                    writer.writerow(["# Image Resize", f"{cmd_args.get('image_resize')}%"])
-                writer.writerow(["# Recursive", cmd_args.get("recursive", "N/A")])
-                writer.writerow(["# Overwrite", cmd_args.get("overwrite", "N/A")])
-                writer.writerow(["# Keep If Larger", cmd_args.get("keep_if_larger", "N/A")])
-                writer.writerow(["# Progress Interval", cmd_args.get("progress_interval", "N/A")])
-                if cmd_args.get("ffmpeg_path"):
-                    writer.writerow(["# FFmpeg Path", cmd_args.get("ffmpeg_path")])
-                if cmd_args.get("backup_dir"):
-                    writer.writerow(["# Backup Directory", cmd_args.get("backup_dir")])
+        writer.writerow(["# Arguments"])
+        writer.writerow(["# Source Folder", cmd_args.get("source_folder", "N/A")])
+        writer.writerow(["# Video CRF", cmd_args.get("video_crf", "N/A")])
+        writer.writerow(["# Video Preset", cmd_args.get("video_preset", "N/A")])
+        writer.writerow(["# Image Quality", cmd_args.get("image_quality", "N/A")])
+        if cmd_args.get("image_resize"):
+            writer.writerow(["# Image Resize", f"{cmd_args.get('image_resize')}%"])
+        writer.writerow(["# Recursive", cmd_args.get("recursive", "N/A")])
+        writer.writerow(["# Overwrite", cmd_args.get("overwrite", "N/A")])
+        writer.writerow(["# Keep If Larger", cmd_args.get("keep_if_larger", "N/A")])
+        writer.writerow(["# Progress Interval", cmd_args.get("progress_interval", "N/A")])
+        if cmd_args.get("ffmpeg_path"):
+            writer.writerow(["# FFmpeg Path", cmd_args.get("ffmpeg_path")])
+        if cmd_args.get("backup_dir"):
+            writer.writerow(["# Backup Directory", cmd_args.get("backup_dir")])

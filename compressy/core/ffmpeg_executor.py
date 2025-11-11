@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 # ============================================================================
@@ -103,63 +103,67 @@ class FFmpegExecutor:
         cmd = [self.ffmpeg_path] + args
 
         # Start FFmpeg process with unbuffered stderr
-        process = subprocess.Popen(
+        process = self._launch_process(cmd)
+
+        stderr_lines = self._collect_progress(process, progress_interval)
+        stdout, stderr_lines = self._finalize_process(process, stderr_lines)
+        result = subprocess.CompletedProcess(cmd, process.returncode, stdout, "\n".join(stderr_lines))
+
+        self._raise_on_error(result, cmd)
+        return result
+
+    def _launch_process(self, cmd: List[str]) -> subprocess.Popen:
+        return subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
-            bufsize=0,  # Unbuffered for real-time reading
+            bufsize=0,
         )
 
+    def _collect_progress(self, process: subprocess.Popen, progress_interval: float) -> List[str]:
+        stderr_lines: List[str] = []
         last_update_time = time.time()
 
-        # Read stderr while process is running
-        stderr_lines = []
         while process.poll() is None:
             line = process.stderr.readline()
             if line:
-                stderr_lines.append(line.rstrip())
-                # Parse progress information
-                progress = self.parse_progress(line)
+                stripped = line.rstrip()
+                stderr_lines.append(stripped)
+                last_update_time = self._maybe_print_progress(stripped, last_update_time, progress_interval)
+            time.sleep(0.1)
 
-                if progress:
-                    current_time = time.time()
+        return stderr_lines
 
-                    # Display progress update if interval has passed
-                    if current_time - last_update_time >= progress_interval:
-                        progress_str = "  [Progress] "
-                        if "time" in progress:
-                            progress_str += f"Time: {progress['time']} | "
-                        if "frame" in progress:
-                            progress_str += f"Frame: {progress['frame']} | "
-                        if "fps" in progress:
-                            progress_str += f"FPS: {progress['fps']} | "
-                        if "bitrate" in progress:
-                            progress_str += f"Bitrate: {progress['bitrate']} | "
-                        if "size" in progress:
-                            progress_str += f"Size: {progress['size']} | "
-                        if "speed" in progress:
-                            progress_str += f"Speed: {progress['speed']}"
+    def _maybe_print_progress(self, line: str, last_update: float, interval: float) -> float:
+        progress = self.parse_progress(line)
+        if not progress:
+            return last_update
 
-                        print(progress_str)
-                        last_update_time = current_time
-            time.sleep(0.1)  # Small sleep to avoid busy waiting
+        current_time = time.time()
+        if current_time - last_update < interval:
+            return last_update
 
-        # Get remaining stderr and stdout output
+        print(self._format_progress(progress))
+        return current_time
+
+    def _format_progress(self, progress: Dict[str, str]) -> str:
+        segments: List[str] = []
+        for key in ("time", "frame", "fps", "bitrate", "size", "speed"):
+            if key in progress:
+                label = key.capitalize() if key != "fps" else "FPS"
+                segments.append(f"{label}: {progress[key]}")
+        if not segments:
+            return "  [Progress]"
+        return "  [Progress] " + " | ".join(segments)
+
+    def _finalize_process(self, process: subprocess.Popen, stderr_lines: List[str]) -> Tuple[str, List[str]]:
         stdout, remaining_stderr = process.communicate()
         if remaining_stderr:
-            for line in remaining_stderr.splitlines():
-                if line.strip():
-                    stderr_lines.append(line.rstrip())
-                    # Check for final progress update
-                    progress = self.parse_progress(line)
+            stderr_lines.extend(line.rstrip() for line in remaining_stderr.splitlines() if line.strip())
+        return stdout, stderr_lines
 
-        stderr = "\n".join(stderr_lines)
-
-        # Create CompletedProcess-like object
-        result = subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
-
+    @staticmethod
+    def _raise_on_error(result: subprocess.CompletedProcess, cmd: List[str]) -> None:
         if result.returncode != 0:
-            raise subprocess.CalledProcessError(result.returncode, cmd, stdout, stderr)
-
-        return result
+            raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
