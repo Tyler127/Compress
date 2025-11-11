@@ -25,6 +25,11 @@ class CompressionConfig:
     keep_if_larger: bool = False
     backup_dir: Optional[Path] = None
     preserve_format: bool = False
+    preserve_timestamps: bool = False
+    min_size: Optional[int] = None
+    max_size: Optional[int] = None
+    output_dir: Optional[Path] = None
+    video_resolution: Optional[str] = None
 
 
 # ============================================================================
@@ -43,6 +48,9 @@ class ParameterValidator:
         ParameterValidator.validate_video_preset(config.video_preset)
         ParameterValidator.validate_video_resize(config.video_resize)
         ParameterValidator.validate_image_resize(config.image_resize)
+        ParameterValidator.validate_size_range(config.min_size, config.max_size)
+        ParameterValidator.validate_output_dir(config.output_dir, config.overwrite, config.source_folder)
+        ParameterValidator.validate_video_resolution(config.video_resolution)
 
     @staticmethod
     def validate_video_crf(video_crf: int) -> None:
@@ -84,3 +92,35 @@ class ParameterValidator:
         """Validate image resize value."""
         if image_resize is not None and not (1 <= image_resize <= 100):
             raise ValueError(f"image_resize must be between 1 and 100, got {image_resize}")
+
+    @staticmethod
+    def validate_size_range(min_size: Optional[int], max_size: Optional[int]) -> None:
+        """Validate min_size and max_size values."""
+        if min_size is not None and min_size < 0:
+            raise ValueError(f"min_size must be non-negative, got {min_size}")
+        if max_size is not None and max_size < 0:
+            raise ValueError(f"max_size must be non-negative, got {max_size}")
+        if min_size is not None and max_size is not None and min_size > max_size:
+            raise ValueError(f"min_size ({min_size}) cannot be greater than max_size ({max_size})")
+
+    @staticmethod
+    def validate_output_dir(output_dir: Optional[Path], overwrite: bool, source_folder: Path) -> None:
+        """Validate output directory configuration."""
+        if output_dir is not None and overwrite:
+            raise ValueError("Cannot use --output-dir and --overwrite together. Choose one.")
+        if output_dir is not None and source_folder.resolve() == output_dir.resolve():
+            raise ValueError("output_dir cannot be the same as source_folder")
+
+    @staticmethod
+    def validate_video_resolution(video_resolution: Optional[str]) -> None:
+        """Validate video resolution format."""
+        if video_resolution is None:
+            return
+
+        # Import parse_resolution to validate
+        from compressy.utils.format import parse_resolution
+
+        try:
+            parse_resolution(video_resolution)
+        except ValueError as e:
+            raise ValueError(f"Invalid video resolution: {e}")

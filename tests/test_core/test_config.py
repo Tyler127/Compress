@@ -2,8 +2,6 @@
 Tests for compressy.core.config module.
 """
 
-from pathlib import Path
-
 import pytest
 
 from compressy.core.config import CompressionConfig, ParameterValidator
@@ -219,3 +217,90 @@ class TestParameterValidator:
         config = CompressionConfig(source_folder=temp_dir, image_resize=150)
         with pytest.raises(ValueError):
             ParameterValidator.validate(config)
+
+    def test_validate_size_range_valid(self):
+        """Test validation of valid size ranges."""
+        # Both None is valid
+        ParameterValidator.validate_size_range(None, None)
+        # Only min_size
+        ParameterValidator.validate_size_range(1024, None)
+        # Only max_size
+        ParameterValidator.validate_size_range(None, 1024 * 1024)
+        # Both with min < max
+        ParameterValidator.validate_size_range(1024, 1024 * 1024)
+        # Equal values
+        ParameterValidator.validate_size_range(1024, 1024)
+
+    def test_validate_size_range_negative_min(self):
+        """Test validation catches negative min_size."""
+        with pytest.raises(ValueError, match="min_size must be non-negative"):
+            ParameterValidator.validate_size_range(-1, None)
+
+    def test_validate_size_range_negative_max(self):
+        """Test validation catches negative max_size."""
+        with pytest.raises(ValueError, match="max_size must be non-negative"):
+            ParameterValidator.validate_size_range(None, -1)
+
+    def test_validate_size_range_min_greater_than_max(self):
+        """Test validation catches min_size > max_size."""
+        with pytest.raises(ValueError, match="min_size.*cannot be greater than max_size"):
+            ParameterValidator.validate_size_range(1024 * 1024, 1024)
+
+    def test_validate_output_dir_valid(self, temp_dir):
+        """Test validation of valid output_dir."""
+        output_dir = temp_dir / "output"
+        # Valid: output_dir without overwrite
+        ParameterValidator.validate_output_dir(output_dir, False, temp_dir)
+        # Valid: no output_dir with overwrite
+        ParameterValidator.validate_output_dir(None, True, temp_dir)
+        # Valid: no output_dir without overwrite
+        ParameterValidator.validate_output_dir(None, False, temp_dir)
+
+    def test_validate_output_dir_with_overwrite(self, temp_dir):
+        """Test validation catches output_dir with overwrite."""
+        output_dir = temp_dir / "output"
+        with pytest.raises(ValueError, match="Cannot use --output-dir and --overwrite together"):
+            ParameterValidator.validate_output_dir(output_dir, True, temp_dir)
+
+    def test_validate_output_dir_same_as_source(self, temp_dir):
+        """Test validation catches output_dir same as source_folder."""
+        with pytest.raises(ValueError, match="output_dir cannot be the same as source_folder"):
+            ParameterValidator.validate_output_dir(temp_dir, False, temp_dir)
+
+    def test_validate_video_resolution_valid(self):
+        """Test validation of valid video resolutions."""
+        # None is valid
+        ParameterValidator.validate_video_resolution(None)
+        # Named resolutions
+        ParameterValidator.validate_video_resolution("720p")
+        ParameterValidator.validate_video_resolution("1080p")
+        ParameterValidator.validate_video_resolution("4k")
+        # Explicit resolutions
+        ParameterValidator.validate_video_resolution("1920x1080")
+        ParameterValidator.validate_video_resolution("1280x720")
+
+    def test_validate_video_resolution_invalid(self):
+        """Test validation catches invalid video resolution."""
+        with pytest.raises(ValueError, match="Invalid video resolution"):
+            ParameterValidator.validate_video_resolution("invalid")
+        with pytest.raises(ValueError, match="Invalid video resolution"):
+            ParameterValidator.validate_video_resolution("1920")
+
+    def test_config_with_new_fields(self, temp_dir):
+        """Test CompressionConfig with new fields."""
+        output_dir = temp_dir / "output"
+        config = CompressionConfig(
+            source_folder=temp_dir,
+            min_size=1024,
+            max_size=1024 * 1024,
+            output_dir=output_dir,
+            video_resolution="1080p",
+        )
+
+        assert config.min_size == 1024
+        assert config.max_size == 1024 * 1024
+        assert config.output_dir == output_dir
+        assert config.video_resolution == "1080p"
+
+        # Should validate successfully
+        ParameterValidator.validate(config)

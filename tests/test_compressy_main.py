@@ -5,9 +5,10 @@ Tests for the main compressy.py script.
 import importlib.util
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 
 # Import the main function from the root compressy.py
 # Load it as a module since it's not in a package
@@ -182,6 +183,7 @@ class TestCompressyMain:
             "--backup-dir",
             str(backup_dir),
             "--preserve-format",
+            "--preserve-timestamps",
         ][i]
 
         mock_config = MagicMock()
@@ -220,6 +222,66 @@ class TestCompressyMain:
                 assert call_kwargs["keep_if_larger"] is True
                 assert call_kwargs["backup_dir"] == Path(backup_dir)
                 assert call_kwargs["preserve_format"] is True
+                assert call_kwargs["preserve_timestamps"] is True
+
+    @patch("compressy.py.MediaCompressor")
+    @patch("compressy.py.CompressionConfig")
+    @patch("sys.argv")
+    def test_main_with_size_filters_and_output_dir(
+        self, mock_argv, mock_config_class, mock_compressor_class, temp_dir, capsys
+    ):
+        """Test main() handles min/max size, output dir, and video resolution options."""
+        output_dir = temp_dir / "custom_output"
+        mock_argv.__getitem__.side_effect = lambda i: [
+            "compressy.py",
+            str(temp_dir),
+            "--min-size",
+            "1MB",
+            "--max-size",
+            "5MB",
+            "--output-dir",
+            str(output_dir),
+            "--video-resolution",
+            "1280x720",
+        ][i]
+
+        mock_config = MagicMock()
+        mock_config_class.return_value = mock_config
+
+        mock_compressor = MagicMock()
+        mock_compressor.compress.return_value = {
+            "processed": 1,
+            "skipped": 0,
+            "errors": 0,
+            "total_original_size": 1000,
+            "total_compressed_size": 800,
+            "space_saved": 200,
+        }
+        mock_compressor_class.return_value = mock_compressor
+
+        with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
+            mock_report_gen = MagicMock()
+            mock_report_gen.generate.return_value = [output_dir / "reports" / "test_report.csv"]
+            mock_report_gen_class.return_value = mock_report_gen
+
+            with patch("compressy.py.StatisticsManager"):
+                result = compressy_main.main()
+
+        assert result == 0
+
+        # Verify CompressionConfig received parsed values
+        call_kwargs = mock_config_class.call_args[1]
+        assert call_kwargs["min_size"] == 1024 * 1024
+        assert call_kwargs["max_size"] == 5 * 1024 * 1024
+        assert call_kwargs["output_dir"] == output_dir
+        assert call_kwargs["video_resolution"] == "1280x720"
+
+        # Verify cmd_args includes optional parameters
+        cmd_args = mock_report_gen.generate.call_args.kwargs["cmd_args"]
+        assert cmd_args["min_size"] == "1MB"
+        assert cmd_args["max_size"] == "5MB"
+        assert cmd_args["output_dir"] == str(output_dir)
+        assert cmd_args["video_resolution"] == "1280x720"
 
     @patch("compressy.py.MediaCompressor")
     @patch("compressy.py.CompressionConfig")

@@ -50,31 +50,57 @@ class VideoCompressor:
         Returns:
             List of FFmpeg arguments
         """
-        ffmpeg_args = ["-i", str(in_path)]
-        
-        # Add video resize filter if specified (and not 0 or 100)
-        if self.config.video_resize is not None and 0 < self.config.video_resize < 100:
+        args = ["-i", str(in_path)]
+        # Check if a specific target video resolution is given in the config.
+        # If so, use fixed width and height. This assures the output video gets resized
+        # exactly to those dimensions. We use 'parse_resolution' to support strings like "1280x720".
+        # FFmpeg requires both dimensions to be divisible by 2 for most codecs, so this
+        # logic (using -2 conventionally) could be refactored, but assumes incoming values are correct.
+        if getattr(self.config, "video_resolution", None):
+            from compressy.utils.format import parse_resolution
+
+            width, height = parse_resolution(self.config.video_resolution)
+            # Use -2 for width or height to ensure divisibility by 2 (FFmpeg requirement)
+            args.extend(["-vf", f"scale={width}:{height}"])
+        # If explicit video_resolution is not provided but a resize percentage is,
+        # and it is a valid percentage (0 < resize < 100), scale by that percentage.
+        # This is useful for users who want a proportional resize rather than a fixed dimension.
+        elif getattr(self.config, "video_resize", None) is not None and 0 < self.config.video_resize < 100:
             resize_factor = self.config.video_resize / 100
-            ffmpeg_args.extend([
-                "-vf",
-                f"scale=iw*{resize_factor}:ih*{resize_factor}:flags=lanczos"
-            ])
-        
-        ffmpeg_args.extend([
-            "-vcodec",
-            "libx264",
-            "-crf",
-            str(self.config.video_crf),
-            "-preset",
-            self.config.video_preset,
-            "-acodec",
-            "aac",
-            "-b:a",
-            "128k",
-            "-map_metadata",
-            "0",
-            "-y",  # Overwrite output file if it exists
-            str(out_path),
-        ])
-        
-        return ffmpeg_args
+            # FFmpeg scale filter can use expressions like iw (input width) and ih (input height), so we multiply them.
+            # 'flags=lanczos' is used for better quality resampling.
+            args.extend(["-vf", f"scale=iw*{resize_factor}:ih*{resize_factor}:flags=lanczos"])
+
+        # Add video codec settings
+        args.extend(
+            [
+                "-vcodec",
+                "libx264",
+                "-crf",
+                str(self.config.video_crf),
+                "-preset",
+                self.config.video_preset,
+            ]
+        )
+
+        # Add audio codec settings
+        args.extend(
+            [
+                "-acodec",
+                "aac",
+                "-b:a",
+                "128k",
+            ]
+        )
+
+        # Preserve metadata and allow overwrite
+        args.extend(
+            [
+                "-map_metadata",
+                "0",
+                "-y",  # Overwrite output file if it exists
+                str(out_path),
+            ]
+        )
+
+        return args

@@ -2,7 +2,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 from compressy.core.config import CompressionConfig, ParameterValidator
 from compressy.core.ffmpeg_executor import FFmpegExecutor
@@ -73,7 +73,11 @@ class MediaCompressor:
             return result
 
         # Setup compressed folder
-        compressed_folder = self.config.source_folder / "compressed"
+        if self.config.output_dir:
+            compressed_folder = self.config.output_dir
+        else:
+            compressed_folder = self.config.source_folder / "compressed"
+
         if not self.config.overwrite:
             compressed_folder.mkdir(parents=True, exist_ok=True)
 
@@ -93,19 +97,43 @@ class MediaCompressor:
         return self.stats.get_stats()
 
     def _collect_files(self) -> List[Path]:
-        """Collect files to process based on recursive setting."""
+        """Collect files to process based on recursive setting and size filters."""
         if self.config.recursive:
-            return [
+            files = [
                 f
                 for f in self.config.source_folder.rglob("*")
                 if f.suffix.lower() in self.video_exts + self.image_exts and f.is_file()
             ]
         else:
-            return [
+            files = [
                 f
                 for f in self.config.source_folder.iterdir()
                 if f.suffix.lower() in self.video_exts + self.image_exts and f.is_file()
             ]
+
+        # Apply size filters if specified
+        if self.config.min_size is not None or self.config.max_size is not None:
+            filtered_files = []
+            for f in files:
+                try:
+                    file_size = f.stat().st_size
+
+                    # Check min_size
+                    if self.config.min_size is not None and file_size < self.config.min_size:
+                        continue
+
+                    # Check max_size
+                    if self.config.max_size is not None and file_size > self.config.max_size:
+                        continue
+
+                    filtered_files.append(f)
+                except (OSError, FileNotFoundError):
+                    # Skip files that can't be accessed
+                    continue
+
+            return filtered_files
+
+        return files
 
     def _get_folder_key(self, file_path: Path) -> str:
         """Get folder key for recursive mode statistics."""
@@ -130,6 +158,89 @@ class MediaCompressor:
             total_files: Total number of files
             compressed_folder: Path to compressed folder
         """
+        in_path, out_path = self._resolve_paths(file_path, compressed_folder)
+        folder_key = self._get_folder_key(file_path)
+        original_size = in_path.stat().st_size
+        self.stats.add_total_file_size(original_size, folder_key)
+
+        file_start_time = time.time()
+        file_type, file_extension = self._identify_file(file_path)
+        if file_type is None:
+            self._handle_unsupported_type(
+                file_path,
+                in_path,
+                out_path,
+                original_size,
+                folder_key,
+                file_start_time,
+            )
+            return
+
+        if self._should_skip_existing(
+            file_path, out_path, original_size, folder_key, file_type, file_extension, idx, total_files
+        ):
+            return
+
+        print(f"[{idx}/{total_files}] Processing: {file_path.name} ({format_size(original_size)})")
+
+        try:
+            self._compress_by_type(file_type, in_path, out_path)
+            if self.config.preserve_timestamps:
+                self.file_processor.preserve_timestamps(in_path, out_path)
+
+            compressed_size = out_path.stat().st_size
+            file_processing_time = time.time() - file_start_time
+
+            if self._handle_larger_file_if_needed(
+                in_path,
+                out_path,
+                original_size,
+                compressed_size,
+                file_processing_time,
+                folder_key,
+                file_type,
+                file_extension,
+            ):
+                return
+
+            self._finalize_success(
+                file_path,
+                in_path,
+                out_path,
+                original_size,
+                compressed_size,
+                file_processing_time,
+                folder_key,
+                file_type,
+                file_extension,
+            )
+
+        except subprocess.CalledProcessError as error:
+            self._handle_subprocess_error(
+                error,
+                file_path,
+                in_path,
+                out_path,
+                original_size,
+                folder_key,
+                file_type,
+                file_extension,
+                file_start_time,
+            )
+        except Exception as error:
+            self._handle_general_error(
+                error,
+                file_path,
+                in_path,
+                out_path,
+                original_size,
+                folder_key,
+                file_type,
+                file_extension,
+                file_start_time,
+            )
+
+    def _resolve_paths(self, file_path: Path, compressed_folder: Path) -> Tuple[Path, Path]:
         in_path = file_path
         out_path = self.file_processor.determine_output_path(
             file_path,
@@ -138,177 +249,285 @@ class MediaCompressor:
             self.config.overwrite,
         )
 
-        # If not preserving format and this is an image (not already JPEG), convert to JPEG
-        if not self.config.preserve_format and file_path.suffix.lower() in self.image_exts:
-            if file_path.suffix.lower() not in [".jpg", ".jpeg"]:
-                # Change output extension to .jpg
-                out_path = out_path.with_suffix(".jpg")
+        if (
+            not self.config.preserve_format
+            and file_path.suffix.lower() in self.image_exts
+            and file_path.suffix.lower() not in [".jpg", ".jpeg"]
+        ):
+            out_path = out_path.with_suffix(".jpg")
 
-        folder_key = self._get_folder_key(file_path)
-        original_size = in_path.stat().st_size
+        return in_path, out_path
 
-        # Add to total original size (but not total_files count - that's set once upfront)
-        self.stats.add_total_file_size(original_size, folder_key)
-
-        # Determine file type and extension
-        file_suffix = file_path.suffix.lower()
-        if file_suffix in self.video_exts:
+    def _identify_file(self, file_path: Path) -> (Optional[str], Optional[str]):
+        suffix = file_path.suffix.lower()
+        if suffix in self.video_exts:
             file_type = "video"
-        elif file_suffix in self.image_exts:
+        elif suffix in self.image_exts:
             file_type = "image"
         else:
             file_type = None
+        file_extension = suffix.lstrip(".") if suffix else None
+        return file_type, file_extension
 
-        file_extension = file_suffix.lstrip(".") if file_suffix else None
+    def _should_skip_existing(
+        self,
+        file_path: Path,
+        out_path: Path,
+        original_size: int,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+        idx: int,
+        total_files: int,
+    ) -> bool:
+        if self.config.overwrite or not out_path.exists():
+            return False
 
-        # Skip if already compressed and not overwriting
-        if not self.config.overwrite and out_path.exists():
-            existing_size = out_path.stat().st_size
-            self.stats.update_stats(original_size, existing_size, 0, "skipped", folder_key, file_type, file_extension)
-            print(f"[{idx}/{total_files}] Skipping (already exists): {file_path.name} ({format_size(existing_size)})")
-            return
+        existing_size = out_path.stat().st_size
+        self.stats.update_stats(original_size, existing_size, 0, "skipped", folder_key, file_type, file_extension)
+        print(f"[{idx}/{total_files}] Skipping (already exists): {file_path.name} ({format_size(existing_size)})")
+        return True
 
-        print(f"[{idx}/{total_files}] Processing: {file_path.name} ({format_size(original_size)})")
+    def _compress_by_type(self, file_type: str, in_path: Path, out_path: Path) -> None:
+        if file_type == "video":
+            self.video_compressor.compress(in_path, out_path)
+        elif file_type == "image":
+            self.image_compressor.compress(in_path, out_path)
+        else:
+            raise ValueError(f"Unsupported file type: {in_path.suffix}")
 
-        # Track processing time
-        file_start_time = time.time()
+    def _handle_larger_file_if_needed(
+        self,
+        in_path: Path,
+        out_path: Path,
+        original_size: int,
+        compressed_size: int,
+        file_processing_time: float,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+    ) -> bool:
+        if compressed_size <= original_size:
+            return False
 
-        try:
-            # Compress based on file type
-            if file_suffix in self.video_exts:
-                self.video_compressor.compress(in_path, out_path)
-            elif file_suffix in self.image_exts:
-                self.image_compressor.compress(in_path, out_path)
+        if self.config.keep_if_larger:
+            message = "  ⚠️  Warning: Compressed file is larger than original"
+            message += f" ({format_size(compressed_size)} > {format_size(original_size)})"
+            print(message)
+            return False
+
+        self._handle_larger_replacement(
+            in_path,
+            out_path,
+            original_size,
+            compressed_size,
+            file_processing_time,
+            folder_key,
+            file_type,
+            file_extension,
+        )
+        return True
+
+    def _handle_larger_replacement(
+        self,
+        in_path: Path,
+        out_path: Path,
+        original_size: int,
+        compressed_size: int,
+        file_processing_time: float,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+    ) -> None:
+        if out_path.exists():
+            out_path.unlink()
+
+        if not self.config.overwrite:
+            if self.config.preserve_timestamps:
+                shutil.copy2(in_path, out_path)
+                self.file_processor.preserve_timestamps(in_path, out_path)
             else:
-                raise ValueError(f"Unsupported file type: {file_path.suffix}")
+                shutil.copy(in_path, out_path)
+            print(f"  ⚠️  Compressed file larger, copying original instead: {format_size(original_size)}")
 
-            # Preserve timestamps
-            self.file_processor.preserve_timestamps(in_path, out_path)
+            file_info = self._build_file_info(
+                in_path,
+                original_size,
+                original_size,
+                0,
+                0.0,
+                file_processing_time,
+                "success (copied original)",
+                file_type,
+                file_extension,
+            )
+            self.stats.add_file_info(file_info, folder_key)
+            self.stats.update_stats(original_size, original_size, 0, "processed", folder_key, file_type, file_extension)
+        else:
+            message = "  ⚠️  Compressed file is larger"
+            message += f" ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
+            print(message)
+            self.stats.update_stats(original_size, 0, 0, "skipped", folder_key, file_type, file_extension)
 
-            # Get compressed size
-            compressed_size = out_path.stat().st_size
-            space_saved = original_size - compressed_size
-            compression_ratio = (space_saved / original_size * 100) if original_size > 0 else 0
+    def _finalize_success(
+        self,
+        file_path: Path,
+        in_path: Path,
+        out_path: Path,
+        original_size: int,
+        compressed_size: int,
+        file_processing_time: float,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+    ) -> None:
+        space_saved = original_size - compressed_size
+        compression_ratio = (space_saved / original_size * 100) if original_size > 0 else 0
 
-            # Check if compressed file is larger than original
-            if compressed_size > original_size:
-                if self.config.keep_if_larger:
-                    print(
-                        f"  ⚠️  Warning: Compressed file is larger than original ({format_size(compressed_size)} > {format_size(original_size)})"
-                    )
-                else:
-                    # Skip compressed version
-                    if out_path.exists():
-                        out_path.unlink()
+        self.stats.update_stats(
+            original_size, compressed_size, space_saved, "processed", folder_key, file_type, file_extension
+        )
 
-                    if not self.config.overwrite:
-                        # Copy original to compressed folder
-                        shutil.copy2(in_path, out_path)
-                        self.file_processor.preserve_timestamps(in_path, out_path)
-                        print(f"  ⚠️  Compressed file larger, copying original instead: {format_size(original_size)}")
+        file_info = self._build_file_info(
+            in_path,
+            original_size,
+            compressed_size,
+            space_saved,
+            compression_ratio,
+            file_processing_time,
+            "success",
+            file_type,
+            file_extension,
+        )
+        self.stats.add_file_info(file_info, folder_key)
 
-                        # Track as processed with no compression
-                        file_processing_time = time.time() - file_start_time
-                        file_info = {
-                            "name": str(file_path.relative_to(self.config.source_folder)),
-                            "original_size": original_size,
-                            "compressed_size": original_size,
-                            "space_saved": 0,
-                            "compression_ratio": 0.0,
-                            "processing_time": file_processing_time,
-                            "status": "success (copied original)",
-                            "file_type": file_type,
-                            "file_extension": file_extension,
-                        }
-                        self.stats.add_file_info(file_info, folder_key)
-                        self.stats.update_stats(
-                            original_size, original_size, 0, "processed", folder_key, file_type, file_extension
-                        )
-                    else:
-                        # In overwrite mode, just skip
-                        print(
-                            f"  ⚠️  Compressed file is larger ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
-                        )
-                        self.stats.update_stats(original_size, 0, 0, "skipped", folder_key, file_type, file_extension)
-                    return
+        if self.config.overwrite and out_path.exists():
+            self.file_processor.handle_overwrite(in_path, out_path)
 
-            # Calculate processing time
-            file_processing_time = time.time() - file_start_time
-
-            # Update statistics
-            self.stats.update_stats(
-                original_size, compressed_size, space_saved, "processed", folder_key, file_type, file_extension
+        if compression_ratio < 0:
+            print(
+                f"  ⚠️  Compressed (larger): {format_size(original_size)} → {format_size(compressed_size)} "
+                f"({compression_ratio:.1f}% increase)"
+            )
+        else:
+            print(
+                f"  ✓ Compressed: {format_size(original_size)} → {format_size(compressed_size)} "
+                f"({compression_ratio:.1f}% reduction)"
             )
 
-            file_info = {
-                "name": str(file_path.relative_to(self.config.source_folder)),
-                "original_size": original_size,
-                "compressed_size": compressed_size,
-                "space_saved": space_saved,
-                "compression_ratio": compression_ratio,
-                "processing_time": file_processing_time,
-                "status": "success",
-                "file_type": file_type,
-                "file_extension": file_extension,
-            }
-            self.stats.add_file_info(file_info, folder_key)
+    def _build_file_info(
+        self,
+        in_path: Path,
+        original_size: int,
+        compressed_size: int,
+        space_saved: int,
+        compression_ratio: float,
+        processing_time: float,
+        status: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+    ) -> Dict:
+        return {
+            "name": str(in_path.relative_to(self.config.source_folder)),
+            "original_size": original_size,
+            "compressed_size": compressed_size,
+            "space_saved": space_saved,
+            "compression_ratio": compression_ratio,
+            "processing_time": processing_time,
+            "status": status,
+            "file_type": file_type,
+            "file_extension": file_extension,
+        }
 
-            # Handle overwrite
-            if self.config.overwrite and out_path.exists():
-                self.file_processor.handle_overwrite(in_path, out_path)
+    def _handle_subprocess_error(
+        self,
+        error: subprocess.CalledProcessError,
+        file_path: Path,
+        in_path: Path,
+        out_path: Path,
+        original_size: int,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+        file_start_time: float,
+    ) -> None:
+        print(f"  ✗ Error processing {in_path}: FFmpeg error")
+        self._record_failure(
+            error,
+            file_path,
+            original_size,
+            folder_key,
+            file_type,
+            file_extension,
+            file_start_time,
+        )
+        self._cleanup_output(out_path)
 
-            # Print result
-            if compression_ratio < 0:
-                print(
-                    f"  ⚠️  Compressed (larger): {format_size(original_size)} → {format_size(compressed_size)} "
-                    f"({compression_ratio:.1f}% increase)"
-                )
-            else:
-                print(
-                    f"  ✓ Compressed: {format_size(original_size)} → {format_size(compressed_size)} "
-                    f"({compression_ratio:.1f}% reduction)"
-                )
+    def _handle_general_error(
+        self,
+        error: Exception,
+        file_path: Path,
+        in_path: Path,
+        out_path: Path,
+        original_size: int,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+        file_start_time: float,
+    ) -> None:
+        print(f"  ✗ Error processing {in_path}: {error}")
+        self._record_failure(
+            error,
+            file_path,
+            original_size,
+            folder_key,
+            file_type,
+            file_extension,
+            file_start_time,
+        )
+        self._cleanup_output(out_path)
 
-        except subprocess.CalledProcessError as e:
-            print(f"  ✗ Error processing {in_path}: FFmpeg error")
-            file_processing_time = time.time() - file_start_time
+    def _record_failure(
+        self,
+        error: Exception,
+        file_path: Path,
+        original_size: int,
+        folder_key: str,
+        file_type: Optional[str],
+        file_extension: Optional[str],
+        file_start_time: float,
+    ) -> None:
+        file_processing_time = time.time() - file_start_time
+        file_info = {
+            "name": str(file_path.relative_to(self.config.source_folder)),
+            "original_size": original_size,
+            "file_type": file_type,
+            "file_extension": file_extension,
+            "compressed_size": 0,
+            "space_saved": 0,
+            "compression_ratio": 0,
+            "processing_time": file_processing_time,
+            "status": f"error: {str(error)}",
+        }
+        self.stats.add_file_info(file_info, folder_key)
+        self.stats.update_stats(original_size, 0, 0, "error", folder_key, file_type, file_extension)
 
-            file_info = {
-                "name": str(file_path.relative_to(self.config.source_folder)),
-                "original_size": original_size,
-                "file_type": file_type,
-                "file_extension": file_extension,
-                "compressed_size": 0,
-                "space_saved": 0,
-                "compression_ratio": 0,
-                "processing_time": file_processing_time,
-                "status": f"error: {str(e)}",
-            }
-            self.stats.add_file_info(file_info, folder_key)
-            self.stats.update_stats(original_size, 0, 0, "error", folder_key, file_type, file_extension)
+    @staticmethod
+    def _cleanup_output(out_path: Path) -> None:
+        if out_path.exists():
+            out_path.unlink()
 
-            # Clean up failed output file
-            if out_path.exists():
-                out_path.unlink()
-
-        except Exception as e:
-            print(f"  ✗ Error processing {in_path}: {e}")
-            file_processing_time = time.time() - file_start_time
-
-            file_info = {
-                "name": str(file_path.relative_to(self.config.source_folder)),
-                "original_size": original_size,
-                "file_type": file_type,
-                "file_extension": file_extension,
-                "compressed_size": 0,
-                "space_saved": 0,
-                "compression_ratio": 0,
-                "processing_time": file_processing_time,
-                "status": f"error: {str(e)}",
-            }
-            self.stats.add_file_info(file_info, folder_key)
-            self.stats.update_stats(original_size, 0, 0, "error", folder_key, file_type, file_extension)
-
-            # Clean up failed output file
-            if out_path.exists():
-                out_path.unlink()
+    def _handle_unsupported_type(
+        self,
+        file_path: Path,
+        in_path: Path,
+        out_path: Path,
+        original_size: int,
+        folder_key: str,
+        file_start_time: float,
+    ) -> None:
+        error = ValueError(f"Unsupported file type: {file_path.suffix}")
+        print(f"  ✗ Error processing {in_path}: {error}")
+        file_extension = file_path.suffix.lstrip(".") if file_path.suffix else None
+        self._record_failure(error, file_path, original_size, folder_key, None, file_extension, file_start_time)
+        self._cleanup_output(out_path)

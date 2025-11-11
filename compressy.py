@@ -5,7 +5,7 @@ from compressy.core.config import CompressionConfig
 from compressy.core.media_compressor import MediaCompressor
 from compressy.services.reports import ReportGenerator
 from compressy.services.statistics import StatisticsManager
-from compressy.utils.format import format_size
+from compressy.utils.format import format_size, parse_size
 
 
 # ============================================================================
@@ -14,7 +14,7 @@ from compressy.utils.format import format_size
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compress media files (videos and images) while preserving timestamps."
+        description="Compress media files (videos and images)."
     )
     parser.add_argument(
         "source_folder",
@@ -93,6 +93,11 @@ def main():
         help="Preserve original image formats (default: convert all images to JPEG)"
     )
     parser.add_argument(
+        "--preserve-timestamps",
+        action="store_true",
+        help="Preserve original timestamps for output files (default: disabled)"
+    )
+    parser.add_argument(
         "--view-stats",
         action="store_true",
         help="View cumulative compression statistics and exit"
@@ -104,6 +109,30 @@ def main():
         const=-1,
         metavar="N",
         help="View run history and exit (optionally limit to N most recent runs, default: all)"
+    )
+    parser.add_argument(
+        "--min-size",
+        type=str,
+        default=None,
+        help="Minimum file size to process (e.g., '1MB', '500KB', '1.5GB')"
+    )
+    parser.add_argument(
+        "--max-size",
+        type=str,
+        default=None,
+        help="Maximum file size to process (e.g., '100MB', '1GB', '2.5GB')"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Custom output directory for compressed files (cannot be used with --overwrite)"
+    )
+    parser.add_argument(
+        "--video-resolution",
+        type=str,
+        default=None,
+        help="Target video resolution (e.g., '1920x1080', '720p', '1080p', '4k')"
     )
     
     args = parser.parse_args()
@@ -133,6 +162,10 @@ def main():
         # Generate unique UUID for this compression run
         run_uuid = str(uuid.uuid4())
         
+        # Parse size arguments if provided
+        min_size = parse_size(args.min_size) if args.min_size else None
+        max_size = parse_size(args.max_size) if args.max_size else None
+        
         # Create configuration
         config = CompressionConfig(
             source_folder=Path(args.source_folder),
@@ -147,7 +180,12 @@ def main():
             progress_interval=args.progress_interval,
             keep_if_larger=args.keep_if_larger,
             backup_dir=Path(args.backup_dir) if args.backup_dir else None,
-            preserve_format=args.preserve_format
+            preserve_format=args.preserve_format,
+            preserve_timestamps=args.preserve_timestamps,
+            min_size=min_size,
+            max_size=max_size,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            video_resolution=args.video_resolution
         )
         
         # Compress media
@@ -170,11 +208,21 @@ def main():
             'overwrite': args.overwrite,
             'keep_if_larger': args.keep_if_larger,
             'progress_interval': args.progress_interval,
+            'preserve_format': args.preserve_format,
+            'preserve_timestamps': args.preserve_timestamps,
         }
         if args.ffmpeg_path:
             cmd_args['ffmpeg_path'] = args.ffmpeg_path
         if args.backup_dir:
             cmd_args['backup_dir'] = args.backup_dir
+        if args.min_size:
+            cmd_args['min_size'] = args.min_size
+        if args.max_size:
+            cmd_args['max_size'] = args.max_size
+        if args.output_dir:
+            cmd_args['output_dir'] = args.output_dir
+        if args.video_resolution:
+            cmd_args['video_resolution'] = args.video_resolution
         
         report_generator = ReportGenerator(Path.cwd())
         report_paths = report_generator.generate(stats, compressed_folder_name, recursive=args.recursive, cmd_args=cmd_args, run_uuid=run_uuid)

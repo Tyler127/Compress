@@ -42,8 +42,16 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["compressy", "."]
-include = ["compressy/*", "compressy.py"]
-omit = ["tests/*", "*/tests/*", "*/test_*.py", "*/__pycache__/*", "*/htmlcov/*", "*/site-packages/*"]
+omit = [
+    "tests/*",
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/htmlcov/*",
+    "*/site-packages/*",
+    "setup.py",
+    "code_cleanup.py"
+]
 
 [tool.coverage.report]
 exclude_lines = [
