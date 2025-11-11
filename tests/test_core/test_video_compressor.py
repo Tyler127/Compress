@@ -168,3 +168,16 @@ class TestVideoCompressor:
         assert "-vf" in args
         vf_index = args.index("-vf")
         assert "scale=iw*0.5:ih*0.5:flags=lanczos" in args[vf_index + 1]
+
+    def test_build_ffmpeg_args_with_video_resolution(self, mock_ffmpeg_executor, temp_dir):
+        """Test building FFmpeg arguments when a target resolution is supplied."""
+        config = CompressionConfig(source_folder=temp_dir, video_resolution="720p")
+        compressor = VideoCompressor(mock_ffmpeg_executor, config)
+        in_path = Path("input.mp4")
+        out_path = Path("output.mp4")
+
+        args = compressor._build_ffmpeg_args(in_path, out_path)
+
+        assert "-vf" in args
+        vf_index = args.index("-vf")
+        assert args[vf_index + 1] == "scale=1280:720"

@@ -805,6 +805,30 @@ class TestStatisticsManager:
         assert ".JPG:" in output.out
         assert ".PNG:" in output.out
 
+    def test_print_stats_with_empty_format_breakdown(self, temp_dir, capsys):
+        """Test printing stats skips format section when all counts are zero."""
+        stats_dir = temp_dir / "statistics"
+        manager = StatisticsManager(stats_dir)
+
+        run_stats = {
+            "processed": 1,
+            "skipped": 0,
+            "errors": 0,
+            "total_original_size": 0,
+            "total_compressed_size": 0,
+            "space_saved": 0,
+            "format_stats": {
+                "mp4": {"count": 0, "original_size": 0, "compressed_size": 0, "space_saved": 0},
+                "jpg": {"count": 0, "original_size": 0, "compressed_size": 0, "space_saved": 0},
+            },
+        }
+
+        manager.update_cumulative_stats(run_stats)
+        manager.print_stats()
+
+        output = capsys.readouterr()
+        assert "By Format:" not in output.out
+
     def test_print_stats_with_invalid_format_json(self, temp_dir, capsys):
         """Test printing stats handles invalid format JSON gracefully."""
         stats_dir = temp_dir / "statistics"

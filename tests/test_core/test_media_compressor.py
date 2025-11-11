@@ -581,3 +581,80 @@ class TestMediaCompressor:
             # Error should be handled and output file should be cleaned up (line 285)
             assert compressor.stats.stats["errors"] == 1
             assert not output_file.exists()
+
+    def test_collect_files_applies_size_filters(self, temp_dir):
+        """Test _collect_files honors min and max size thresholds."""
+        config = CompressionConfig(source_folder=temp_dir, min_size=500, max_size=1500)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        (temp_dir / "small.mp4").write_bytes(b"0" * 400)
+        (temp_dir / "within.mp4").write_bytes(b"0" * 1000)
+        (temp_dir / "large.mp4").write_bytes(b"0" * 3000)
+
+        files = compressor._collect_files()
+
+        assert {f.name for f in files} == {"within.mp4"}
+
+    def test_resolve_paths_uses_output_dir(self, temp_dir):
+        """Test _resolve_paths respects a custom output directory."""
+        output_dir = temp_dir / "custom_out"
+        config = CompressionConfig(source_folder=temp_dir, output_dir=output_dir)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        source_file = temp_dir / "clip.mp4"
+        source_file.write_bytes(b"0" * 100)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        _, out_path = compressor._resolve_paths(source_file, output_dir)
+
+        assert out_path.parent == output_dir
+        assert out_path.name == "clip.mp4"
+
+    def test_compress_by_type_invalid_type(self, mock_config, temp_dir):
+        """Test _compress_by_type raises ValueError for unsupported file types."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        with pytest.raises(ValueError, match="Unsupported file type"):
+            compressor._compress_by_type("audio", temp_dir / "input.wav", temp_dir / "output.wav")
+
+    def test_compress_uses_custom_output_dir(self, temp_dir):
+        """Test compress() sends files to a custom output directory."""
+        output_dir = temp_dir / "custom_out"
+        config = CompressionConfig(source_folder=temp_dir, output_dir=output_dir)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        dummy_file = temp_dir / "video.mp4"
+        dummy_file.write_bytes(b"0" * 100)
+
+        with patch.object(compressor, "_collect_files", return_value=[dummy_file]), patch.object(
+            compressor, "_process_file"
+        ) as mock_process:
+            compressor.compress()
+
+        mock_process.assert_called_once()
+        assert mock_process.call_args[0][3] == output_dir
+
+    def test_collect_files_skips_on_stat_error(self, temp_dir):
+        """Test _collect_files skips files when stat raises an error."""
+        config = CompressionConfig(source_folder=temp_dir, min_size=0)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        error_file = temp_dir / "broken.mp4"
+        error_file.write_bytes(b"0" * 1000)
+
+        original_stat = Path.stat
+
+        def mock_stat(self, *args, **kwargs):
+            if self == error_file:
+                raise OSError("stat failed")
+            return original_stat(self, *args, **kwargs)
+
+        with patch.object(Path, "stat", mock_stat):
+            files = compressor._collect_files()
+
+        assert files == []
