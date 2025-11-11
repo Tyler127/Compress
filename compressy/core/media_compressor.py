@@ -185,7 +185,8 @@ class MediaCompressor:
 
         try:
             self._compress_by_type(file_type, in_path, out_path)
-            self.file_processor.preserve_timestamps(in_path, out_path)
+            if self.config.preserve_timestamps:
+                self.file_processor.preserve_timestamps(in_path, out_path)
 
             compressed_size = out_path.stat().st_size
             file_processing_time = time.time() - file_start_time
@@ -342,8 +343,11 @@ class MediaCompressor:
             out_path.unlink()
 
         if not self.config.overwrite:
-            shutil.copy2(in_path, out_path)
-            self.file_processor.preserve_timestamps(in_path, out_path)
+            if self.config.preserve_timestamps:
+                shutil.copy2(in_path, out_path)
+                self.file_processor.preserve_timestamps(in_path, out_path)
+            else:
+                shutil.copy(in_path, out_path)
             print(f"  ⚠️  Compressed file larger, copying original instead: {format_size(original_size)}")
 
             file_info = self._build_file_info(

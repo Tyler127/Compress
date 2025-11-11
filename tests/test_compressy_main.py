@@ -183,6 +183,7 @@ class TestCompressyMain:
             "--backup-dir",
             str(backup_dir),
             "--preserve-format",
+            "--preserve-timestamps",
         ][i]
 
         mock_config = MagicMock()
@@ -221,6 +222,7 @@ class TestCompressyMain:
                 assert call_kwargs["keep_if_larger"] is True
                 assert call_kwargs["backup_dir"] == Path(backup_dir)
                 assert call_kwargs["preserve_format"] is True
+                assert call_kwargs["preserve_timestamps"] is True
 
     @patch("compressy.py.MediaCompressor")
     @patch("compressy.py.CompressionConfig")

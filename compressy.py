@@ -13,7 +13,7 @@ from compressy.utils.format import format_size, parse_size
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compress media files (videos and images) while preserving timestamps."
+        description="Compress media files (videos and images)."
     )
     parser.add_argument(
         "source_folder",
@@ -90,6 +90,11 @@ def main():
         "--preserve-format",
         action="store_true",
         help="Preserve original image formats (default: convert all images to JPEG)"
+    )
+    parser.add_argument(
+        "--preserve-timestamps",
+        action="store_true",
+        help="Preserve original timestamps for output files (default: disabled)"
     )
     parser.add_argument(
         "--view-stats",
@@ -172,6 +177,7 @@ def main():
             keep_if_larger=args.keep_if_larger,
             backup_dir=Path(args.backup_dir) if args.backup_dir else None,
             preserve_format=args.preserve_format,
+            preserve_timestamps=args.preserve_timestamps,
             min_size=min_size,
             max_size=max_size,
             output_dir=Path(args.output_dir) if args.output_dir else None,
@@ -199,6 +205,7 @@ def main():
             'keep_if_larger': args.keep_if_larger,
             'progress_interval': args.progress_interval,
             'preserve_format': args.preserve_format,
+            'preserve_timestamps': args.preserve_timestamps,
         }
         if args.ffmpeg_path:
             cmd_args['ffmpeg_path'] = args.ffmpeg_path

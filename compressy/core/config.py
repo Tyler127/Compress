@@ -25,6 +25,7 @@ class CompressionConfig:
     keep_if_larger: bool = False
     backup_dir: Optional[Path] = None
     preserve_format: bool = False
+    preserve_timestamps: bool = False
     min_size: Optional[int] = None
     max_size: Optional[int] = None
     output_dir: Optional[Path] = None
