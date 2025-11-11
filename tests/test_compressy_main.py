@@ -116,6 +116,19 @@ class TestCompressyMain:
             mock_stats_mgr.print_history.assert_called_once_with(limit=None)
 
     @patch("compressy.py.StatisticsManager")
+    @patch("sys.argv", new=["compressy.py", "-h"])
+    def test_main_view_history_short_flag(self, mock_stats_mgr_class, temp_dir, capsys):
+        """Test main() with -h flag (short for --view-history)."""
+        with patch("sys.argv", ["compressy.py", "-h"]):
+            mock_stats_mgr = MagicMock()
+            mock_stats_mgr_class.return_value = mock_stats_mgr
+
+            result = compressy_main.main()
+
+            assert result == 0
+            mock_stats_mgr.print_history.assert_called_once_with(limit=None)
+
+    @patch("compressy.py.StatisticsManager")
     @patch("sys.argv", new=["compressy.py", "--view-history", "5"])
     def test_main_view_history_limit(self, mock_stats_mgr_class, temp_dir, capsys):
         """Test main() with --view-history N flag (limit to N)."""
@@ -631,6 +644,107 @@ class TestCompressyMain:
                 # Should show single report message, not multiple reports
                 assert "Report: " in output.out
                 assert "Reports generated: " not in output.out
+
+    @patch("compressy.py.MediaCompressor")
+    @patch("compressy.py.CompressionConfig")
+    @patch("sys.argv")
+    def test_main_with_short_flags(self, mock_argv, mock_config_class, mock_compressor_class, temp_dir):
+        """Test main() handles multi-character short flags correctly."""
+        output_dir = temp_dir / "custom_output"
+        backup_dir = temp_dir / "backup"
+        mock_argv.__getitem__.side_effect = lambda i: [
+            "compressy.py",
+            str(temp_dir),
+            "-crf",
+            "26",
+            "-vp",
+            "fast",
+            "-vr",
+            "80",
+            "-iq",
+            "82",
+            "-ir",
+            "75",
+            "-r",
+            "-o",
+            "--ffmpeg-path",
+            "/custom/path/ffmpeg",
+            "-pi",
+            "2.5",
+            "-kl",
+            "--backup-dir",
+            str(backup_dir),
+            "-pf",
+            "-pt",
+            "-m",
+            "1MB",
+            "-M",
+            "5MB",
+            "-d",
+            str(output_dir),
+            "-res",
+            "720p",
+        ][i]
+
+        mock_config = MagicMock()
+        mock_config_class.return_value = mock_config
+
+        mock_compressor = MagicMock()
+        mock_compressor.compress.return_value = {
+            "processed": 1,
+            "skipped": 0,
+            "errors": 0,
+            "total_original_size": 1000,
+            "total_compressed_size": 800,
+            "space_saved": 200,
+        }
+        mock_compressor_class.return_value = mock_compressor
+
+        with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
+            mock_report_gen = MagicMock()
+            mock_report_gen.generate.return_value = [output_dir / "reports" / "test_report.csv"]
+            mock_report_gen_class.return_value = mock_report_gen
+
+            with patch("compressy.py.StatisticsManager"):
+                result = compressy_main.main()
+
+        assert result == 0
+
+        call_kwargs = mock_config_class.call_args[1]
+        assert call_kwargs["video_crf"] == 26
+        assert call_kwargs["video_preset"] == "fast"
+        assert call_kwargs["video_resize"] == 80
+        assert call_kwargs["image_quality"] == 82
+        assert call_kwargs["image_resize"] == 75
+        assert call_kwargs["recursive"] is True
+        assert call_kwargs["overwrite"] is True
+        assert call_kwargs["ffmpeg_path"] == "/custom/path/ffmpeg"
+        assert call_kwargs["progress_interval"] == 2.5
+        assert call_kwargs["keep_if_larger"] is True
+        assert call_kwargs["backup_dir"] == Path(backup_dir)
+        assert call_kwargs["preserve_format"] is True
+        assert call_kwargs["preserve_timestamps"] is True
+        assert call_kwargs["min_size"] == 1024 * 1024
+        assert call_kwargs["max_size"] == 5 * 1024 * 1024
+        assert call_kwargs["output_dir"] == output_dir
+        assert call_kwargs["video_resolution"] == "720p"
+
+        cmd_args = mock_report_gen.generate.call_args.kwargs["cmd_args"]
+        assert cmd_args["video_crf"] == 26
+        assert cmd_args["video_preset"] == "fast"
+        assert cmd_args["video_resize"] == 80
+        assert cmd_args["image_quality"] == 82
+        assert cmd_args["image_resize"] == 75
+        assert cmd_args["recursive"] is True
+        assert cmd_args["overwrite"] is True
+        assert cmd_args["keep_if_larger"] is True
+        assert cmd_args["progress_interval"] == 2.5
+        assert cmd_args["preserve_format"] is True
+        assert cmd_args["preserve_timestamps"] is True
+        assert cmd_args["min_size"] == "1MB"
+        assert cmd_args["max_size"] == "5MB"
+        assert cmd_args["output_dir"] == str(output_dir)
+        assert cmd_args["video_resolution"] == "720p"
 
     @patch("compressy.py.MediaCompressor")
     @patch("compressy.py.CompressionConfig")
