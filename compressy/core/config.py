@@ -51,6 +51,7 @@ class ParameterValidator:
         ParameterValidator.validate_size_range(config.min_size, config.max_size)
         ParameterValidator.validate_output_dir(config.output_dir, config.overwrite, config.source_folder)
         ParameterValidator.validate_video_resolution(config.video_resolution)
+        ParameterValidator.validate_video_resize_and_resolution(config.video_resize, config.video_resolution)
 
     @staticmethod
     def validate_video_crf(video_crf: int) -> None:
@@ -124,3 +125,12 @@ class ParameterValidator:
             parse_resolution(video_resolution)
         except ValueError as e:
             raise ValueError(f"Invalid video resolution: {e}")
+
+    @staticmethod
+    def validate_video_resize_and_resolution(video_resize: Optional[int], video_resolution: Optional[str]) -> None:
+        """Validate that video_resize and video_resolution are not used together."""
+        if video_resize is not None and video_resolution is not None:
+            raise ValueError(
+                "Cannot use --video-resize and --video-resolution together. "
+                "Choose one: use --video-resize for proportional scaling or --video-resolution for fixed dimensions."
+            )

@@ -304,3 +304,28 @@ class TestParameterValidator:
 
         # Should validate successfully
         ParameterValidator.validate(config)
+
+    def test_validate_video_resize_and_resolution_conflict(self, temp_dir):
+        """Test validation catches using both video_resize and video_resolution together."""
+        config = CompressionConfig(
+            source_folder=temp_dir,
+            video_resize=90,
+            video_resolution="720p",
+        )
+
+        with pytest.raises(ValueError, match="Cannot use --video-resize and --video-resolution together"):
+            ParameterValidator.validate(config)
+
+    def test_validate_video_resize_and_resolution_separate(self, temp_dir):
+        """Test validation allows video_resize or video_resolution separately."""
+        # Only video_resize
+        config1 = CompressionConfig(source_folder=temp_dir, video_resize=90)
+        ParameterValidator.validate(config1)
+
+        # Only video_resolution
+        config2 = CompressionConfig(source_folder=temp_dir, video_resolution="720p")
+        ParameterValidator.validate(config2)
+
+        # Neither (should preserve original resolution)
+        config3 = CompressionConfig(source_folder=temp_dir)
+        ParameterValidator.validate(config3)
