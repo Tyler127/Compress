@@ -113,7 +113,7 @@ class FFmpegExecutor:
         return result
 
     def _launch_process(self, cmd: List[str]) -> subprocess.Popen:
-        return subprocess.Popen(
+        return subprocess.Popen(  # nosec B603
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
