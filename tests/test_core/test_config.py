@@ -2,9 +2,12 @@
 Tests for compressy.core.config module.
 """
 
+from pathlib import Path
+from unittest.mock import mock_open, patch
+
 import pytest
 
-from compressy.core.config import CompressionConfig, ParameterValidator
+from compressy.core.config import CompressionConfig, LoggingConfig, ParameterValidator
 
 
 @pytest.mark.unit
@@ -329,3 +332,50 @@ class TestParameterValidator:
         # Neither (should preserve original resolution)
         config3 = CompressionConfig(source_folder=temp_dir)
         ParameterValidator.validate(config3)
+
+
+@pytest.mark.unit
+class TestLoggingConfig:
+    """Tests for LoggingConfig class."""
+
+    def test_load_from_file_file_not_exists(self, temp_dir):
+        """Test load_from_file returns defaults when file doesn't exist."""
+        config_path = temp_dir / "nonexistent.json"
+        config = LoggingConfig.load_from_file(config_path)
+
+        assert config.log_level == "INFO"
+        assert config.log_dir == "logs"
+        assert config.enable_console is True
+        assert config.enable_file is True
+
+    def test_load_from_file_json_decode_error(self, temp_dir):
+        """Test load_from_file handles JSON decode error."""
+        config_path = temp_dir / "invalid.json"
+        config_path.write_text("{ invalid json }")
+
+        with patch("builtins.print") as mock_print:
+            config = LoggingConfig.load_from_file(config_path)
+
+        # Should return default config
+        assert config.log_level == "INFO"
+        # Should print warning
+        mock_print.assert_called_once()
+        assert "Warning" in str(mock_print.call_args)
+
+    def test_load_from_file_io_error(self, temp_dir):
+        """Test load_from_file handles IO error."""
+        config_path = temp_dir / "unreadable.json"
+        # Create the file so exists() returns True, but open() will fail
+        config_path.touch()
+
+        # The code catches IOError, which in Python 3 is an alias for OSError
+        # But we need to raise IOError specifically to match the except clause
+        with patch("builtins.open", side_effect=IOError("Permission denied")):
+            with patch("builtins.print") as mock_print:
+                config = LoggingConfig.load_from_file(config_path)
+
+        # Should return default config
+        assert config.log_level == "INFO"
+        # Should print warning
+        mock_print.assert_called_once()
+        assert "Warning" in str(mock_print.call_args)
