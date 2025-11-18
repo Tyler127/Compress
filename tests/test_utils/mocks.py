@@ -2,7 +2,6 @@
 Reusable mock objects for testing.
 """
 
-from typing import Dict, List
 from unittest.mock import MagicMock
 
 
@@ -46,24 +45,3 @@ def mock_file_stat(size: int = 1024, mtime: float = 1234567890.0):
     mock_stat.st_mtime = mtime
     mock_stat.st_atime = mtime
     return mock_stat
-
-
-def mock_csv_reader(content: List[Dict]):
-    """Create a mock CSV reader."""
-
-    class MockCSVReader:
-        def __init__(self, rows):
-            self.rows = rows
-            self.index = 0
-
-        def __iter__(self):
-            return self
-
-        def __next__(self):
-            if self.index < len(self.rows):
-                row = self.rows[self.index]
-                self.index += 1
-                return row
-            raise StopIteration
-
-    return MockCSVReader(content)

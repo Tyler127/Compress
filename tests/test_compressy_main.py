@@ -70,7 +70,7 @@ class TestCompressyMain:
             # Mock ReportGenerator
             with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
                 mock_report_gen = MagicMock()
-                mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+                mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
                 mock_report_gen_class.return_value = mock_report_gen
 
                 # Mock StatisticsManager
@@ -215,7 +215,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):
@@ -274,7 +274,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [output_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [output_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):
@@ -355,7 +355,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager") as mock_stats_mgr_class:
@@ -420,8 +420,8 @@ class TestCompressyMain:
             mock_report_gen = MagicMock()
             # Multiple reports for recursive mode
             mock_report_gen.generate.return_value = [
-                temp_dir / "reports" / "report1.csv",
-                temp_dir / "reports" / "report2.csv",
+                temp_dir / "reports" / "report1.json",
+                temp_dir / "reports" / "report2.json",
             ]
             mock_report_gen_class.return_value = mock_report_gen
 
@@ -513,7 +513,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):
@@ -553,7 +553,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):
@@ -594,7 +594,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):
@@ -633,7 +633,7 @@ class TestCompressyMain:
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
             # Single report in recursive mode
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "report1.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "report1.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):
@@ -774,7 +774,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager") as mock_stats_mgr_class:
@@ -818,7 +818,7 @@ class TestCompressyMain:
 
         with patch("compressy.py.ReportGenerator") as mock_report_gen_class:
             mock_report_gen = MagicMock()
-            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.csv"]
+            mock_report_gen.generate.return_value = [temp_dir / "reports" / "test_report.json"]
             mock_report_gen_class.return_value = mock_report_gen
 
             with patch("compressy.py.StatisticsManager"):

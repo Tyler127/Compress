@@ -1,5 +1,5 @@
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple

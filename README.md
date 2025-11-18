@@ -46,7 +46,7 @@ A powerful Python command-line tool for compressing videos and images using FFmp
 - **📂 Custom Output Directory**: Save compressed files to a custom location instead of the default 'compressed' folder
 - **🔄 Format Conversion**: Converts all images to JPEG for maximum compression (unless `--preserve-format` is used)
 - **📊 Statistics Tracking**: Track compression statistics across multiple runs with cumulative totals
-- **📈 Detailed Reports**: Generate CSV reports with per-file compression details
+- **📈 Detailed Reports**: Generate JSON reports with per-file compression details
 - **💾 Backup Support**: Automatically create backups before compression
 - **⚡ Progress Monitoring**: Real-time progress updates during compression
 - **🛡️ Safe Defaults**: Skip files that would increase in size (unless `--keep-if-larger` is used)
@@ -239,7 +239,7 @@ python compressy.py --help
 
 ### Reports
 
-Compressy generates detailed CSV reports in the `reports/` directory:
+Compressy generates detailed JSON reports in the `reports/` directory:
 
 - **Non-recursive mode**: Single report file
 - **Recursive mode**: Per-folder reports + aggregated report
@@ -255,8 +255,8 @@ Report includes:
 ### Statistics
 
 Statistics are stored in `statistics/` directory:
-- `statistics.csv`: Cumulative statistics across all runs
-- `run_history.csv`: Individual run history
+- `statistics.json`: Cumulative statistics across all runs
+- `files.json`: Individual run history with file details
 
 Use `--view-stats` and `--view-history` to view these statistics.
 

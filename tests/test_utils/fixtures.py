@@ -38,21 +38,3 @@ def create_test_directory_structure(base_dir: Path, structure: List[str]) -> Non
             # It's a file
             path.parent.mkdir(parents=True, exist_ok=True)
             path.touch()
-
-
-def create_test_csv_file(directory: Path, name: str, content: List[List[str]]) -> Path:
-    """Create a test CSV file.
-
-    Args:
-        directory: Directory to create CSV in
-        name: CSV filename
-        content: List of rows, each row is a list of strings
-    """
-    csv_path = directory / name
-    import csv
-
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        for row in content:
-            writer.writerow(row)
-    return csv_path
