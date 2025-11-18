@@ -91,7 +91,7 @@ When adding new functionality:
 
 - **FFmpeg/Subprocess**: Mock `subprocess.Popen` and `subprocess.run`
 - **File System**: Use `tempfile` and `unittest.mock.patch` for file operations
-- **CSV Files**: Mock CSV reading/writing where appropriate
+- **JSON Files**: Mock JSON reading/writing where appropriate
 - **Time/Date**: Mock `datetime.now()` for consistent timestamps
 - **shutil**: Mock `shutil.copytree`, `shutil.copy2` for backup tests
 
