@@ -1,4 +1,7 @@
 import argparse
+import shlex
+import sys
+import uuid
 from pathlib import Path
 from compressy.core.config import CompressionConfig, LoggingConfig
 from compressy.core.media_compressor import MediaCompressor
@@ -14,7 +17,13 @@ from compressy.utils.format import format_size, parse_size
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compress media files (videos and images) while preserving timestamps."
+        description="Compress media files (videos and images).",
+        add_help=False,
+    )
+    parser.add_argument(
+        "--help",
+        action="help",
+        help="Show this help message and exit",
     )
     parser.add_argument(
         "source_folder",
@@ -23,13 +32,13 @@ def main():
         help="Path to the source folder containing media files"
     )
     parser.add_argument(
-        "--video-crf",
+        "-crf", "--video-crf",
         type=int,
         default=23,
         help="Video CRF value (0-51, lower = higher quality, default: 23)"
     )
     parser.add_argument(
-        "--video-preset",
+        "-vp", "--video-preset",
         type=str,
         default="medium",
         choices=["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", 
@@ -37,19 +46,19 @@ def main():
         help="Video encoding preset (default: medium)"
     )
     parser.add_argument(
-        "--video-resize",
+        "-vr", "--video-resize",
         type=int,
         default=None,
         help="Resize videos to percentage of original dimensions (0-100, e.g., 90 = 90%% of original size, 0 = no resize, default: no resize)"
     )
     parser.add_argument(
-        "--image-quality",
+        "-iq", "--image-quality",
         type=int,
         default=100,
         help="Image quality (0-100, higher = better quality, default: 100)"
     )
     parser.add_argument(
-        "--image-resize",
+        "-ir", "--image-resize",
         type=int,
         default=None,
         help="Resize images to percentage of original dimensions (1-100, e.g., 90 = 90%% of original size, default: no resize)"
@@ -60,7 +69,7 @@ def main():
         help="Process files recursively in subdirectories"
     )
     parser.add_argument(
-        "--overwrite",
+        "-o", "--overwrite",
         action="store_true",
         help="Overwrite original files instead of creating a 'compressed' folder"
     )
@@ -71,13 +80,13 @@ def main():
         help="Path to FFmpeg executable (default: auto-detect)"
     )
     parser.add_argument(
-        "--progress-interval",
+        "-pi", "--progress-interval",
         type=float,
         default=5.0,
         help="Seconds between FFmpeg progress updates (default: 5.0)"
     )
     parser.add_argument(
-        "--keep-if-larger",
+        "-kl", "--keep-if-larger",
         action="store_true",
         help="Keep compressed files even if they are larger than the original (default: skip larger files)"
     )
@@ -88,17 +97,22 @@ def main():
         help="Directory to create a backup of the source folder before compression"
     )
     parser.add_argument(
-        "--preserve-format",
+        "-pf", "--preserve-format",
         action="store_true",
         help="Preserve original image formats (default: convert all images to JPEG)"
     )
     parser.add_argument(
-        "--view-stats",
+        "-pt", "--preserve-timestamps",
+        action="store_true",
+        help="Preserve original timestamps for output files (default: disabled)"
+    )
+    parser.add_argument(
+        "-s", "--view-stats",
         action="store_true",
         help="View cumulative compression statistics and exit"
     )
     parser.add_argument(
-        "--view-history",
+        "-h", "--view-history",
         type=int,
         nargs='?',
         const=-1,
@@ -119,25 +133,25 @@ def main():
         help="Directory for log files (default: logs, from config file)"
     )
     parser.add_argument(
-        "--min-size",
+        "-m", "--min-size",
         type=str,
         default=None,
         help="Minimum file size to process (e.g., '1MB', '500KB', '1.5GB')"
     )
     parser.add_argument(
-        "--max-size",
+        "-M", "--max-size",
         type=str,
         default=None,
         help="Maximum file size to process (e.g., '100MB', '1GB', '2.5GB')"
     )
     parser.add_argument(
-        "--output-dir",
+        "-d", "--output-dir",
         type=str,
         default=None,
         help="Custom output directory for compressed files (cannot be used with --overwrite)"
     )
     parser.add_argument(
-        "--video-resolution",
+        "-res", "--video-resolution",
         type=str,
         default=None,
         help="Target video resolution (e.g., '1920x1080', '720p', '1080p', '4k')"
@@ -180,6 +194,17 @@ def main():
         print(f"Warning: Could not initialize logging: {e}")
         # Continue without logging rather than failing
     
+    # Build command string from sys.argv for logging (only for compression runs, not view commands)
+    def build_command_string():
+        """Reconstruct the command string from sys.argv."""        
+        # Use sys.argv but replace the script name with the actual script name
+        cmd_parts = list(sys.argv)
+        # Replace first argument (script path) with just the script name for cleaner output
+        if cmd_parts:
+            cmd_parts[0] = Path(__file__).name
+        
+        return " ".join(shlex.quote(arg) if " " in arg or any(c in arg for c in "&|<>()") else arg for arg in cmd_parts)
+    
     # Handle view commands early (don't require source_folder)
     if args.view_stats or args.view_history is not None:
         script_dir = Path(__file__).resolve().parent
@@ -202,6 +227,9 @@ def main():
         parser.error("source_folder is required for compression (or use --view-stats/--view-history)")
     
     try:
+        # Generate unique UUID for this compression run
+        run_uuid = str(uuid.uuid4())
+        
         # Parse size arguments if provided
         min_size = parse_size(args.min_size) if args.min_size else None
         max_size = parse_size(args.max_size) if args.max_size else None
@@ -221,6 +249,7 @@ def main():
             keep_if_larger=args.keep_if_larger,
             backup_dir=Path(args.backup_dir) if args.backup_dir else None,
             preserve_format=args.preserve_format,
+            preserve_timestamps=args.preserve_timestamps,
             min_size=min_size,
             max_size=max_size,
             output_dir=Path(args.output_dir) if args.output_dir else None,
@@ -248,6 +277,7 @@ def main():
             'keep_if_larger': args.keep_if_larger,
             'progress_interval': args.progress_interval,
             'preserve_format': args.preserve_format,
+            'preserve_timestamps': args.preserve_timestamps,
         }
         if args.ffmpeg_path:
             cmd_args['ffmpeg_path'] = args.ffmpeg_path
@@ -263,7 +293,7 @@ def main():
             cmd_args['video_resolution'] = args.video_resolution
         
         report_generator = ReportGenerator(Path.cwd())
-        report_paths = report_generator.generate(stats, compressed_folder_name, recursive=args.recursive, cmd_args=cmd_args)
+        report_paths = report_generator.generate(stats, compressed_folder_name, recursive=args.recursive, cmd_args=cmd_args, run_uuid=run_uuid)
         
         # Update cumulative statistics
         try:
@@ -272,7 +302,9 @@ def main():
             statistics_dir = script_dir / "statistics"
             stats_manager = StatisticsManager(statistics_dir)
             stats_manager.update_cumulative_stats(stats)
-            stats_manager.append_run_history(stats, cmd_args)
+            # Build command string for logging
+            command_string = build_command_string()
+            stats_manager.append_to_files_log(stats.get('files', []), run_uuid, cmd_args, stats, command_string)
             print(f"Statistics updated: {statistics_dir}")
         except Exception as e:
             import traceback

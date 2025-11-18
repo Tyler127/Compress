@@ -1,6 +1,6 @@
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -119,7 +119,7 @@ class FFmpegExecutor:
         return result
 
     def _launch_process(self, cmd: List[str]) -> subprocess.Popen:
-        return subprocess.Popen(
+        return subprocess.Popen(  # nosec B603
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
