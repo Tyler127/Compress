@@ -4,6 +4,8 @@ Tests for compressy.utils.file_processor module.
 
 import os
 import time
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -141,3 +143,24 @@ class TestFileProcessor:
         # Allow small tolerance
         assert abs(dest_stat.st_mtime - source_stat.st_mtime) < 1.0
         assert abs(dest_stat.st_atime - source_stat.st_atime) < 1.0
+
+    def test_preserve_timestamps_exception_handler(self, temp_dir):
+        """Test that preserve_timestamps handles exceptions gracefully."""
+        source_file = temp_dir / "source.txt"
+        dest_file = temp_dir / "dest.txt"
+
+        source_file.write_text("test")
+        dest_file.write_text("test")
+
+        # Mock stat() to raise an exception
+        with patch.object(Path, "stat", side_effect=OSError("Permission denied")):
+            with patch("compressy.utils.file_processor.get_logger") as mock_get_logger:
+                mock_logger = mock_get_logger.return_value
+
+                # Should not raise, but log warning
+                FileProcessor.preserve_timestamps(source_file, dest_file)
+
+                # Should log warning
+                mock_logger.warning.assert_called_once()
+                call_args = mock_logger.warning.call_args
+                assert "Failed to preserve timestamps" in str(call_args)
