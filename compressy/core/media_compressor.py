@@ -62,8 +62,14 @@ class MediaCompressor:
         # Track total processing time
         start_time = time.time()
 
-        # Collect files
-        all_files = self._collect_files()
+        # Setup compressed folder (determine before collecting files to exclude it)
+        if self.config.output_dir:
+            compressed_folder = self.config.output_dir
+        else:
+            compressed_folder = self.config.source_folder / "compressed"
+
+        # Collect files (exclude files in compressed folder)
+        all_files = self._collect_files(compressed_folder)
 
         if not all_files:
             print("No media files found to compress.")
@@ -71,12 +77,6 @@ class MediaCompressor:
             if not self.config.recursive:
                 result.pop("folder_stats", None)
             return result
-
-        # Setup compressed folder
-        if self.config.output_dir:
-            compressed_folder = self.config.output_dir
-        else:
-            compressed_folder = self.config.source_folder / "compressed"
 
         if not self.config.overwrite:
             compressed_folder.mkdir(parents=True, exist_ok=True)
@@ -96,44 +96,116 @@ class MediaCompressor:
 
         return self.stats.get_stats()
 
-    def _collect_files(self) -> List[Path]:
-        """Collect files to process based on recursive setting and size filters."""
+    def _collect_files(self, compressed_folder: Optional[Path] = None) -> List[Path]:
+        """
+        Collect files to process based on recursive setting and size filters.
+
+        Args:
+            compressed_folder: Path to compressed folder to exclude from collection.
+                               If None or overwrite mode, no exclusion is performed.
+
+        Returns:
+            List of file paths to process
+        """
+        files = self._gather_media_files()
+        files = self._exclude_compressed_folder_files(files, compressed_folder)
+        files = self._apply_size_filters(files)
+        return files
+
+    def _gather_media_files(self) -> List[Path]:
+        """
+        Gather media files from source folder based on recursive setting.
+
+        Returns:
+            List of media file paths
+        """
+        media_exts = self.video_exts + self.image_exts
         if self.config.recursive:
-            files = [
-                f
-                for f in self.config.source_folder.rglob("*")
-                if f.suffix.lower() in self.video_exts + self.image_exts and f.is_file()
-            ]
-        else:
-            files = [
-                f
-                for f in self.config.source_folder.iterdir()
-                if f.suffix.lower() in self.video_exts + self.image_exts and f.is_file()
-            ]
+            return [f for f in self.config.source_folder.rglob("*") if f.suffix.lower() in media_exts and f.is_file()]
+        return [f for f in self.config.source_folder.iterdir() if f.suffix.lower() in media_exts and f.is_file()]
 
-        # Apply size filters if specified
-        if self.config.min_size is not None or self.config.max_size is not None:
-            filtered_files = []
-            for f in files:
-                try:
-                    file_size = f.stat().st_size
+    def _exclude_compressed_folder_files(self, files: List[Path], compressed_folder: Optional[Path]) -> List[Path]:
+        """
+        Exclude files that are inside the compressed folder.
 
-                    # Check min_size
-                    if self.config.min_size is not None and file_size < self.config.min_size:
-                        continue
+        Args:
+            files: List of file paths to filter
+            compressed_folder: Path to compressed folder to exclude
 
-                    # Check max_size
-                    if self.config.max_size is not None and file_size > self.config.max_size:
-                        continue
+        Returns:
+            Filtered list of file paths
+        """
+        if compressed_folder is None or self.config.overwrite:
+            return files
 
-                    filtered_files.append(f)
-                except (OSError, FileNotFoundError):
-                    # Skip files that can't be accessed
+        try:
+            compressed_folder_abs = compressed_folder.resolve()
+            return [f for f in files if not self._is_file_in_folder(f, compressed_folder_abs)]
+        except (OSError, ValueError):
+            # If compressed folder path resolution fails, continue without exclusion
+            return files
+
+    def _is_file_in_folder(self, file_path: Path, folder_path: Path) -> bool:
+        """
+        Check if a file is inside a folder.
+
+        Args:
+            file_path: Path to the file
+            folder_path: Path to the folder
+
+        Returns:
+            True if file is inside folder, False otherwise
+        """
+        try:
+            file_path_abs = file_path.resolve()
+            folder_path_abs = folder_path.resolve()
+
+            # Use is_relative_to for Python 3.9+, fallback for older versions
+            if hasattr(file_path_abs, "is_relative_to"):
+                return file_path_abs.is_relative_to(folder_path_abs)
+
+            # Fallback: check if folder is a parent by using relative_to
+            try:
+                file_path_abs.relative_to(folder_path_abs)
+                return True
+            except ValueError:
+                return False
+        except (ValueError, AttributeError, OSError):
+            # If comparison fails, assume file is not in folder to be safe
+            return False
+
+    def _apply_size_filters(self, files: List[Path]) -> List[Path]:
+        """
+        Apply min and max size filters to file list.
+
+        Args:
+            files: List of file paths to filter
+
+        Returns:
+            Filtered list of file paths
+        """
+        if self.config.min_size is None and self.config.max_size is None:
+            return files
+
+        filtered_files = []
+        for f in files:
+            try:
+                file_size = f.stat().st_size
+
+                # Check min_size
+                if self.config.min_size is not None and file_size < self.config.min_size:
                     continue
 
-            return filtered_files
+                # Check max_size
+                if self.config.max_size is not None and file_size > self.config.max_size:
+                    continue
 
-        return files
+                filtered_files.append(f)
+            except (OSError, FileNotFoundError):
+                # Skip files that can't be accessed
+                continue
+
+        return filtered_files
 
     def _get_folder_key(self, file_path: Path) -> str:
         """Get folder key for recursive mode statistics."""

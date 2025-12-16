@@ -761,3 +761,298 @@ class TestMediaCompressor:
             files = compressor._collect_files()
 
         assert files == []
+
+    def test_collect_files_excludes_compressed_directory(self, temp_dir):
+        """Test _collect_files excludes files in the compressed directory."""
+        config = CompressionConfig(source_folder=temp_dir, recursive=True)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        # Create files in source directory
+        (temp_dir / "video1.mp4").touch()
+        (temp_dir / "video2.mp4").touch()
+
+        # Create a subdirectory with files
+        subdir = temp_dir / "subdir"
+        subdir.mkdir()
+        (subdir / "nested.mp4").touch()
+
+        # Create compressed directory with files (should be excluded)
+        compressed_dir = temp_dir / "compressed"
+        compressed_dir.mkdir()
+        (compressed_dir / "compressed1.mp4").touch()
+        (compressed_dir / "compressed2.mp4").touch()
+
+        # Create nested compressed directory
+        compressed_subdir = compressed_dir / "nested"
+        compressed_subdir.mkdir()
+        (compressed_subdir / "nested_compressed.mp4").touch()
+
+        files = compressor._collect_files(compressed_dir)
+
+        # Should find files in root and subdir, but NOT in compressed directory
+        file_names = {f.name for f in files}
+        assert "video1.mp4" in file_names
+        assert "video2.mp4" in file_names
+        assert "nested.mp4" in file_names
+        assert "compressed1.mp4" not in file_names
+        assert "compressed2.mp4" not in file_names
+        assert "nested_compressed.mp4" not in file_names
+
+    def test_collect_files_excludes_custom_output_directory(self, temp_dir):
+        """Test _collect_files excludes files in custom output directory."""
+        custom_output = temp_dir / "custom_output"
+        config = CompressionConfig(source_folder=temp_dir, recursive=True, output_dir=custom_output)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        # Create files in source directory
+        (temp_dir / "video1.mp4").touch()
+
+        # Create custom output directory with files (should be excluded)
+        custom_output.mkdir()
+        (custom_output / "output1.mp4").touch()
+
+        files = compressor._collect_files(custom_output)
+
+        # Should find files in source, but NOT in custom output directory
+        file_names = {f.name for f in files}
+        assert "video1.mp4" in file_names
+        assert "output1.mp4" not in file_names
+
+    def test_collect_files_no_exclusion_in_overwrite_mode(self, temp_dir):
+        """Test _collect_files does not exclude when overwrite mode is enabled."""
+        config = CompressionConfig(source_folder=temp_dir, recursive=True, overwrite=True)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        # Create files in source directory
+        (temp_dir / "video1.mp4").touch()
+
+        # Create compressed directory with files (should NOT be excluded in overwrite mode)
+        compressed_dir = temp_dir / "compressed"
+        compressed_dir.mkdir()
+        (compressed_dir / "compressed1.mp4").touch()
+
+        files = compressor._collect_files(compressed_dir)
+
+        # Should find all files including those in compressed directory
+        file_names = {f.name for f in files}
+        assert "video1.mp4" in file_names
+        assert "compressed1.mp4" in file_names
+
+    def test_gather_media_files_non_recursive(self, mock_config, temp_dir):
+        """Test _gather_media_files in non-recursive mode."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        # Create test files
+        (temp_dir / "video.mp4").touch()
+        (temp_dir / "image.jpg").touch()
+        (temp_dir / "text.txt").touch()  # Should be ignored
+        subdir = temp_dir / "subdir"
+        subdir.mkdir()
+        (subdir / "nested.mp4").touch()  # Should be ignored in non-recursive
+
+        files = compressor._gather_media_files()
+
+        # Should only find files in root, not subdir
+        file_names = {f.name for f in files}
+        assert "video.mp4" in file_names
+        assert "image.jpg" in file_names
+        assert "text.txt" not in file_names
+        assert "nested.mp4" not in file_names
+
+    def test_gather_media_files_recursive(self, temp_dir):
+        """Test _gather_media_files in recursive mode."""
+        config = CompressionConfig(source_folder=temp_dir, recursive=True)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        # Create test files
+        (temp_dir / "video.mp4").touch()
+        subdir = temp_dir / "subdir"
+        subdir.mkdir()
+        (subdir / "nested.mp4").touch()
+
+        files = compressor._gather_media_files()
+
+        # Should find files in root and subdir
+        file_names = {f.name for f in files}
+        assert "video.mp4" in file_names
+        assert "nested.mp4" in file_names
+
+    def test_exclude_compressed_folder_files_with_none(self, mock_config, temp_dir):
+        """Test _exclude_compressed_folder_files with None compressed_folder."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        files = [temp_dir / "video.mp4"]
+        result = compressor._exclude_compressed_folder_files(files, None)
+
+        assert result == files
+
+    def test_exclude_compressed_folder_files_with_overwrite(self, temp_dir):
+        """Test _exclude_compressed_folder_files with overwrite mode."""
+        config = CompressionConfig(source_folder=temp_dir, overwrite=True)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        files = [temp_dir / "video.mp4"]
+        compressed_dir = temp_dir / "compressed"
+        result = compressor._exclude_compressed_folder_files(files, compressed_dir)
+
+        assert result == files
+
+    def test_exclude_compressed_folder_files_resolve_error(self, mock_config, temp_dir):
+        """Test _exclude_compressed_folder_files when resolve fails."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        files = [temp_dir / "video.mp4"]
+        compressed_dir = temp_dir / "compressed"
+
+        # Mock resolve to raise OSError
+        with patch.object(Path, "resolve", side_effect=OSError("Path resolution failed")):
+            result = compressor._exclude_compressed_folder_files(files, compressed_dir)
+
+        # Should return original files when resolve fails
+        assert result == files
+
+    def test_is_file_in_folder_with_is_relative_to(self, mock_config, temp_dir):
+        """Test _is_file_in_folder using is_relative_to method."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        folder = temp_dir / "folder"
+        folder.mkdir()
+        file_inside = folder / "file.mp4"
+        file_inside.touch()
+        file_outside = temp_dir / "file.mp4"
+        file_outside.touch()
+
+        # Test file inside folder
+        assert compressor._is_file_in_folder(file_inside, folder) is True
+
+        # Test file outside folder
+        assert compressor._is_file_in_folder(file_outside, folder) is False
+
+    def test_is_file_in_folder_fallback_relative_to(self, mock_config, temp_dir):
+        """Test _is_file_in_folder using fallback relative_to method."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        folder = temp_dir / "folder"
+        folder.mkdir()
+        file_inside = folder / "file.mp4"
+        file_inside.touch()
+        file_outside = temp_dir / "file.mp4"
+        file_outside.touch()
+
+        # Mock hasattr to return False (simulating older Python version)
+        with patch("builtins.hasattr", return_value=False):
+            # Test file inside folder
+            assert compressor._is_file_in_folder(file_inside, folder) is True
+
+            # Test file outside folder
+            assert compressor._is_file_in_folder(file_outside, folder) is False
+
+    def test_is_file_in_folder_exception_handling(self, mock_config, temp_dir):
+        """Test _is_file_in_folder exception handling."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        folder = temp_dir / "folder"
+        file_path = temp_dir / "file.mp4"
+
+        # Mock resolve to raise OSError
+        with patch.object(Path, "resolve", side_effect=OSError("Path error")):
+            result = compressor._is_file_in_folder(file_path, folder)
+            assert result is False
+
+    def test_apply_size_filters_no_filters(self, mock_config, temp_dir):
+        """Test _apply_size_filters with no size filters."""
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(mock_config)
+
+        files = [temp_dir / "file1.mp4", temp_dir / "file2.mp4"]
+        result = compressor._apply_size_filters(files)
+
+        assert result == files
+
+    def test_apply_size_filters_min_size(self, mock_config, temp_dir):
+        """Test _apply_size_filters with min_size filter."""
+        config = CompressionConfig(source_folder=temp_dir, min_size=500)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        (temp_dir / "small.mp4").write_bytes(b"0" * 400)
+        (temp_dir / "large.mp4").write_bytes(b"0" * 1000)
+
+        files = list(temp_dir.glob("*.mp4"))
+        result = compressor._apply_size_filters(files)
+
+        file_names = {f.name for f in result}
+        assert "small.mp4" not in file_names
+        assert "large.mp4" in file_names
+
+    def test_apply_size_filters_max_size(self, mock_config, temp_dir):
+        """Test _apply_size_filters with max_size filter."""
+        config = CompressionConfig(source_folder=temp_dir, max_size=500)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        (temp_dir / "small.mp4").write_bytes(b"0" * 400)
+        (temp_dir / "large.mp4").write_bytes(b"0" * 1000)
+
+        files = list(temp_dir.glob("*.mp4"))
+        result = compressor._apply_size_filters(files)
+
+        file_names = {f.name for f in result}
+        assert "small.mp4" in file_names
+        assert "large.mp4" not in file_names
+
+    def test_apply_size_filters_both_min_max(self, mock_config, temp_dir):
+        """Test _apply_size_filters with both min and max size filters."""
+        config = CompressionConfig(source_folder=temp_dir, min_size=500, max_size=1500)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        (temp_dir / "small.mp4").write_bytes(b"0" * 400)
+        (temp_dir / "within.mp4").write_bytes(b"0" * 1000)
+        (temp_dir / "large.mp4").write_bytes(b"0" * 3000)
+
+        files = list(temp_dir.glob("*.mp4"))
+        result = compressor._apply_size_filters(files)
+
+        file_names = {f.name for f in result}
+        assert "small.mp4" not in file_names
+        assert "within.mp4" in file_names
+        assert "large.mp4" not in file_names
+
+    def test_apply_size_filters_stat_error(self, temp_dir):
+        """Test _apply_size_filters handles stat errors gracefully."""
+        config = CompressionConfig(source_folder=temp_dir, min_size=500)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+        (temp_dir / "good.mp4").write_bytes(b"0" * 1000)
+        error_file = temp_dir / "error.mp4"
+        error_file.touch()
+
+        files = [temp_dir / "good.mp4", error_file]
+
+        # Mock stat to raise OSError for error_file
+        original_stat = Path.stat
+
+        def mock_stat(self, *args, **kwargs):
+            if str(self) == str(error_file):
+                raise OSError("stat failed")
+            return original_stat(self, *args, **kwargs)
+
+        with patch.object(Path, "stat", mock_stat):
+            result = compressor._apply_size_filters(files)
+
+        # Should only include the good file (error_file is skipped due to stat error)
+        assert len(result) == 1
+        assert result[0].name == "good.mp4"
