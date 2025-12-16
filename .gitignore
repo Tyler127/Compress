@@ -1,6 +1,7 @@
 # Compressy generated files
 /reports/
 /statistics/
+logs/
 
 # Python cache files
 __pycache__/
