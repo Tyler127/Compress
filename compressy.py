@@ -106,6 +106,13 @@ def main():
         help="Preserve original timestamps for output files (default: disabled)"
     )
     parser.add_argument(
+        "--no-auto-rename",
+        dest="auto_rename_duplicates",
+        action="store_false",
+        default=True,
+        help="Disable auto-renaming duplicate source filenames before compression",
+    )
+    parser.add_argument(
         "-s", "--view-stats",
         action="store_true",
         help="View cumulative compression statistics and exit"
@@ -201,6 +208,7 @@ def main():
             backup_dir=Path(args.backup_dir) if args.backup_dir else None,
             preserve_format=args.preserve_format,
             preserve_timestamps=args.preserve_timestamps,
+            auto_rename_duplicates=args.auto_rename_duplicates,
             min_size=min_size,
             max_size=max_size,
             output_dir=Path(args.output_dir) if args.output_dir else None,

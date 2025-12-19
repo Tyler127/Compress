@@ -30,6 +30,7 @@ class CompressionConfig:
     max_size: Optional[int] = None
     output_dir: Optional[Path] = None
     video_resolution: Optional[str] = None
+    auto_rename_duplicates: bool = True
 
 
 # ============================================================================

@@ -2,7 +2,7 @@ import shutil
 import subprocess  # nosec B404
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from compressy.core.config import CompressionConfig, ParameterValidator
 from compressy.core.ffmpeg_executor import FFmpegExecutor
@@ -38,7 +38,7 @@ class MediaCompressor:
         self.backup_manager = BackupManager() if config.backup_dir else None
 
         # File extension lists
-        self.video_exts = [".mp4", ".mov", ".mkv", ".avi"]
+        self.video_exts = [".mp4", ".mov", ".mkv", ".avi", ".m4v", ".ts"]
         self.image_exts = [".jpg", ".jpeg", ".png", ".webp"]
 
     def compress(self) -> Dict:
@@ -55,18 +55,21 @@ class MediaCompressor:
         if not self.config.source_folder.exists():
             raise FileNotFoundError(f"Source folder does not exist: {self.config.source_folder}")
 
+        # Determine compressed folder early for downstream use
+        if self.config.output_dir:
+            compressed_folder = self.config.output_dir
+        else:
+            compressed_folder = self.config.source_folder / "compressed"
+
+        # Pre-flight: rename source duplicates that would collide after conversion
+        self._preflight_rename_duplicates(compressed_folder)
+
         # Create backup if specified
         if self.backup_manager and self.config.backup_dir:
             self.backup_manager.create_backup(self.config.source_folder, self.config.backup_dir)
 
         # Track total processing time
         start_time = time.time()
-
-        # Setup compressed folder (determine before collecting files to exclude it)
-        if self.config.output_dir:
-            compressed_folder = self.config.output_dir
-        else:
-            compressed_folder = self.config.source_folder / "compressed"
 
         # Collect files (exclude files in compressed folder)
         all_files = self._collect_files(compressed_folder)
@@ -224,6 +227,96 @@ class MediaCompressor:
 
         return folder_key
 
+    def _target_output_suffix(self, file_path: Path) -> str:
+        """Determine the suffix the output file will have after format rules."""
+        suffix = file_path.suffix.lower()
+        if not self.config.preserve_format and suffix in self.image_exts and suffix not in [".jpg", ".jpeg"]:
+            return ".jpg"
+        return suffix
+
+    def _preflight_rename_duplicates(self, compressed_folder: Path) -> None:
+        """
+        Rename source files whose eventual outputs would collide.
+
+        Adds suffixes like " (1)" before the extension in the source folder to keep
+        downstream output names unique. Does nothing when the feature is disabled.
+        """
+        if not self.config.auto_rename_duplicates:
+            return
+
+        files = self._collect_preflight_candidates(compressed_folder)
+
+        if not files:
+            return
+
+        used_targets: Set[str] = set()
+        for file_path in self._iter_preflight_files(files):
+            rel_parent = self._safe_relative_parent(file_path)
+            if rel_parent is None:
+                continue
+
+            target_suffix = self._target_output_suffix(file_path)
+            new_path, target_key = self._ensure_unique_source(file_path, rel_parent, target_suffix, used_targets)
+            if new_path != file_path:
+                print(f"Renamed source file to avoid output collision: {file_path.name} -> {new_path.name}")
+            used_targets.add(target_key)
+
+    def _collect_preflight_candidates(self, compressed_folder: Path) -> List[Path]:
+        """Gather files to evaluate for collisions."""
+        files = self._gather_media_files()
+        if compressed_folder and not self.config.overwrite:
+            try:
+                compressed_folder_abs = compressed_folder.resolve()
+                files = [f for f in files if not self._is_file_in_folder(f, compressed_folder_abs)]
+            except (OSError, ValueError):
+                pass
+        return files
+
+    def _iter_preflight_files(self, files: List[Path]) -> List[Path]:
+        """Return files in deterministic order for renaming."""
+        return sorted(files, key=lambda p: str(p).lower())
+
+    def _safe_relative_parent(self, file_path: Path) -> Optional[Path]:
+        """Return parent relative to source folder, or None if outside."""
+        try:
+            return file_path.parent.relative_to(self.config.source_folder)
+        except ValueError:
+            return None
+
+    def _ensure_unique_source(
+        self,
+        file_path: Path,
+        rel_parent: Path,
+        target_suffix: str,
+        used_targets: Set[str],
+    ) -> Tuple[Path, str]:
+        """
+        Ensure the source name is unique for the eventual target path.
+        Returns (possibly renamed path, target_key).
+        """
+        base_stem = file_path.stem
+        candidate_stem = base_stem
+        suffix_index = 0
+
+        while True:
+            target_rel = rel_parent / f"{candidate_stem}{target_suffix}"
+            target_key = str(target_rel).lower()
+            candidate_source_path = file_path.parent / f"{candidate_stem}{file_path.suffix}"
+            if target_key not in used_targets and (
+                candidate_source_path == file_path or not candidate_source_path.exists()
+            ):
+                break
+            suffix_index += 1
+            candidate_stem = f"{base_stem} ({suffix_index})"
+
+        if candidate_stem == base_stem:
+            return file_path, target_key
+
+        new_path = file_path.with_name(f"{candidate_stem}{file_path.suffix}")
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.rename(new_path)
+        return new_path, target_key
+
     def _process_file(self, file_path: Path, idx: int, total_files: int, compressed_folder: Path) -> None:
         """
         Process a single file.
@@ -325,12 +418,8 @@ class MediaCompressor:
             self.config.overwrite,
         )
 
-        if (
-            not self.config.preserve_format
-            and file_path.suffix.lower() in self.image_exts
-            and file_path.suffix.lower() not in [".jpg", ".jpeg"]
-        ):
-            out_path = out_path.with_suffix(".jpg")
+        target_suffix = self._target_output_suffix(file_path)
+        out_path = out_path.with_suffix(target_suffix)
 
         return in_path, out_path
 

@@ -82,6 +82,8 @@ class TestMediaCompressor:
             (temp_dir / "video.mov").touch()
             (temp_dir / "video.mkv").touch()
             (temp_dir / "video.avi").touch()
+            (temp_dir / "video.m4v").touch()
+            (temp_dir / "video.ts").touch()
             (temp_dir / "image.jpg").touch()
             (temp_dir / "image.png").touch()
             (temp_dir / "image.webp").touch()
@@ -91,10 +93,93 @@ class TestMediaCompressor:
             files = compressor._collect_files()
 
             # Should only have media files
-            assert len(files) == 7
+            assert len(files) == 9
             extensions = {f.suffix.lower() for f in files}
             assert ".pdf" not in extensions
             assert ".txt" not in extensions
+
+    def test_preflight_rename_duplicates_adds_suffixes(self, temp_dir):
+        """Preflight renames duplicate outputs with suffixes."""
+        config = CompressionConfig(source_folder=temp_dir)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+            (temp_dir / "file.jpg").touch()
+            (temp_dir / "file.png").touch()
+            (temp_dir / "file.webp").touch()
+
+            compressor._preflight_rename_duplicates(temp_dir / "compressed")
+
+            assert (temp_dir / "file.jpg").exists()
+            assert (temp_dir / "file (1).png").exists()
+            assert (temp_dir / "file (2).webp").exists()
+
+    def test_preflight_rename_duplicates_respects_flag(self, temp_dir):
+        """Preflight does nothing when auto-rename is disabled."""
+        config = CompressionConfig(source_folder=temp_dir, auto_rename_duplicates=False)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+            (temp_dir / "file.png").touch()
+            (temp_dir / "file.webp").touch()
+
+            compressor._preflight_rename_duplicates(temp_dir / "compressed")
+
+            assert (temp_dir / "file.png").exists()
+            assert (temp_dir / "file.webp").exists()
+
+    def test_preflight_skips_files_outside_source(self, temp_dir):
+        """Files outside the source folder are ignored during preflight."""
+        config = CompressionConfig(source_folder=temp_dir)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+            outside = temp_dir.parent / "outside.mp4"
+            outside.parent.mkdir(parents=True, exist_ok=True)
+            outside.touch()
+
+            inside = temp_dir / "inside.mp4"
+            inside.touch()
+
+            with patch.object(compressor, "_gather_media_files", return_value=[outside, inside]):
+                compressor._preflight_rename_duplicates(temp_dir / "compressed")
+
+            assert (temp_dir / "inside.mp4").exists()
+            # Outside file was ignored; inside file unchanged
+            assert (temp_dir / "inside.mp4").name == "inside.mp4"
+
+    def test_preflight_handles_resolve_error(self, temp_dir):
+        """Resolution errors when filtering compressed folder are tolerated."""
+        config = CompressionConfig(source_folder=temp_dir)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+            media = temp_dir / "clip.mp4"
+            media.touch()
+            compressed_folder = temp_dir / "compressed"
+
+            original_resolve = Path.resolve
+
+            def resolve_side_effect(self, *args, **kwargs):
+                if self == compressed_folder:
+                    raise ValueError("resolve failure")
+                return original_resolve(self, *args, **kwargs)
+
+            with patch.object(Path, "resolve", resolve_side_effect):
+                compressor._preflight_rename_duplicates(compressed_folder)
+
+            # No rename should have occurred
+            assert media.exists()
+
+    def test_safe_relative_parent_returns_none_for_outside(self, temp_dir):
+        config = CompressionConfig(source_folder=temp_dir)
+        with patch("compressy.core.media_compressor.FFmpegExecutor"):
+            compressor = MediaCompressor(config)
+
+            outside = temp_dir.parent / "outside.mp4"
+            result = compressor._safe_relative_parent(outside)
+
+            assert result is None
 
     def test_get_folder_key_non_recursive(self, mock_config, temp_dir):
         """Test folder key generation in non-recursive mode."""

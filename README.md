@@ -181,6 +181,9 @@ python compressy.py /path/to/media -pt  # (--preserve-timestamps)
 # Adjust progress update interval (seconds)
 python compressy.py /path/to/media -pi 2.0  # (--progress-interval)
 
+# Disable auto-renaming of duplicate basenames (enabled by default)
+python compressy.py /path/to/media --no-auto-rename
+
 # Output compressed files to custom directory (instead of default 'compressed' folder)
 python compressy.py /path/to/media -d /path/to/output  # (--output-dir)
 
@@ -225,6 +228,7 @@ python compressy.py --help
 | `-o, --overwrite` | Overwrite original files | False |
 | `-pf, --preserve-format` | Preserve original image formats | False |
 | `-pt, --preserve-timestamps` | Preserve original timestamps for output files | False |
+| `--no-auto-rename` | Disable auto-renaming duplicate basenames before compression | False (auto-rename on) |
 | `-m, --min-size` | Minimum file size to process (e.g., '1MB', '500KB', '1.5GB') | None |
 | `-M, --max-size` | Maximum file size to process (e.g., '100MB', '1GB', '2.5GB') | None |
 | `-d, --output-dir` | Custom output directory for compressed files (cannot be used with --overwrite) | None |
@@ -401,6 +405,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **Output directory**: When using `--output-dir`, compressed files are saved to the custom directory. Cannot be combined with `--overwrite`
 - **Video resolution**: The `--video-resolution` option scales videos to the specified resolution. Use standard presets (720p, 1080p, 4k) or custom dimensions (WIDTHxHEIGHT)
 - **File size filtering**: `--min-size` and `--max-size` filter files before processing. Useful for targeting specific file size ranges
+- **Auto-renaming duplicates**: By default, Compressy renames source files that would generate colliding outputs (e.g., same basename across formats or formats that convert to `.jpg`) by adding ` (1)`, ` (2)`, etc. Use `--no-auto-rename` to keep originals, but collisions may cause skips/overwrites if outputs already exist
 
 ## 🐛 Troubleshooting
 
