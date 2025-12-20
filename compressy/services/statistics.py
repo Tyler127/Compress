@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from compressy.utils.format import format_size
 
@@ -22,7 +22,8 @@ class StatisticsTracker:
             recursive: Whether to track per-folder statistics
         """
         self.recursive = recursive
-        self.stats = {
+        # Use a loose mapping to accommodate the nested stats structure.
+        self.stats: Dict[str, Any] = {
             "total_files": 0,
             "processed": 0,
             "skipped": 0,
@@ -54,7 +55,8 @@ class StatisticsTracker:
     def initialize_folder_stats(self, folder_key: str) -> None:
         """Initialize statistics for a folder."""
         if self.recursive and folder_key not in self.stats["folder_stats"]:
-            self.stats["folder_stats"][folder_key] = {
+            folder_stats = self._folder_stats_container()
+            folder_stats[folder_key] = {
                 "total_files": 0,
                 "processed": 0,
                 "skipped": 0,
@@ -88,11 +90,14 @@ class StatisticsTracker:
             file_info: Dictionary with file information
             folder_key: Folder key for recursive mode
         """
-        self.stats["files"].append(file_info)
+        files = cast(List[Dict[str, Any]], self.stats["files"])
+        files.append(file_info)
 
         if self.recursive:
             self.initialize_folder_stats(folder_key)
-            self.stats["folder_stats"][folder_key]["files"].append(file_info)
+            folder_stats = cast(Dict[str, Any], self.stats["folder_stats"])
+            folder_files = cast(List[Dict[str, Any]], folder_stats[folder_key]["files"])
+            folder_files.append(file_info)
 
     def _initialize_format_stats(self, format_stats: Dict, extension: str) -> None:
         """Initialize processed format statistics for a given extension if not exists."""
@@ -193,7 +198,7 @@ class StatisticsTracker:
         space_saved: int,
     ) -> None:
         self._initialize_format_stats(container["processed_file_format_stats"], file_extension)
-        stats = container["processed_file_format_stats"][file_extension]
+        stats = cast(Dict[str, int], container["processed_file_format_stats"][file_extension])
         stats["count"] += 1
         stats["original_size"] += original_size
         stats["compressed_size"] += compressed_size
@@ -272,12 +277,17 @@ class StatisticsTracker:
             container[f"{prefix}_skipped"] += 1
             container[f"{prefix}_original_size"] += original_size
             container[f"{prefix}_compressed_size"] += compressed_size
+            container[f"{prefix}_space_saved"] += space_saved
         elif status == "error":
             container[f"{prefix}_errors"] += 1
 
-    def _get_folder_stats(self, folder_key: str) -> Dict:
+    def _folder_stats_container(self) -> Dict[str, Dict[str, Any]]:
+        return cast(Dict[str, Dict[str, Any]], self.stats["folder_stats"])
+
+    def _get_folder_stats(self, folder_key: str) -> Dict[str, Any]:
         self.initialize_folder_stats(folder_key)
-        return self.stats["folder_stats"][folder_key]
+        folder_stats = self._folder_stats_container()
+        return folder_stats[folder_key]
 
     def add_total_file(self, original_size: int, folder_key: str = "root") -> None:
         """Add a file to total count."""
@@ -285,9 +295,10 @@ class StatisticsTracker:
         self.stats["total_original_size"] += original_size
 
         if self.recursive:
+            folder_stats = self._folder_stats_container()
             self.initialize_folder_stats(folder_key)
-            self.stats["folder_stats"][folder_key]["total_files"] += 1
-            self.stats["folder_stats"][folder_key]["total_original_size"] += original_size
+            folder_stats[folder_key]["total_files"] += 1
+            folder_stats[folder_key]["total_original_size"] += original_size
 
     def add_total_file_size(self, original_size: int, folder_key: str = "root") -> None:
         """Add file size to total (but don't increment global total_files counter).
@@ -298,15 +309,16 @@ class StatisticsTracker:
         self.stats["total_original_size"] += original_size
 
         if self.recursive:
+            folder_stats = self._folder_stats_container()
             self.initialize_folder_stats(folder_key)
-            self.stats["folder_stats"][folder_key]["total_files"] += 1
-            self.stats["folder_stats"][folder_key]["total_original_size"] += original_size
+            folder_stats[folder_key]["total_files"] += 1
+            folder_stats[folder_key]["total_original_size"] += original_size
 
     def set_total_processing_time(self, total_time: float) -> None:
         """Set total processing time."""
         self.stats["total_processing_time"] = total_time
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get all statistics."""
         return self.stats
 
@@ -331,7 +343,7 @@ class StatisticsManager:
         self.cumulative_stats_file = self.statistics_dir / "statistics.json"
         self.files_log_file = self.statistics_dir / "files.json"
 
-    def load_cumulative_stats(self) -> Dict:
+    def load_cumulative_stats(self) -> Dict[str, Any]:
         """
         Load existing cumulative statistics from JSON file.
 
@@ -369,7 +381,7 @@ class StatisticsManager:
 
         try:
             with open(self.cumulative_stats_file, "r", encoding="utf-8") as f:
-                stats = json.load(f)
+                stats = cast(Dict[str, Any], json.load(f))
 
                 # Ensure all required fields exist with defaults
                 # Replace None values and missing keys with defaults
@@ -385,7 +397,7 @@ class StatisticsManager:
             print(f"Warning: Unexpected error reading statistics file ({e}). Creating new file.")
             return default_stats
 
-    def update_cumulative_stats(self, run_stats: Dict) -> None:
+    def update_cumulative_stats(self, run_stats: Dict[str, Any]) -> None:
         """
         Update cumulative statistics with current run results.
 
@@ -439,7 +451,7 @@ class StatisticsManager:
 
         self.save_cumulative_stats(cumulative)
 
-    def save_cumulative_stats(self, stats: Dict) -> None:
+    def save_cumulative_stats(self, stats: Dict[str, Any]) -> None:
         """
         Save cumulative statistics to JSON file.
 
@@ -479,14 +491,14 @@ class StatisticsManager:
 
         print("=" * 60)
 
-    def _print_file_statistics(self, stats: Dict) -> None:
+    def _print_file_statistics(self, stats: Dict[str, Any]) -> None:
         print()
         print("File Statistics:")
         print(f"  Processed: {stats['total_files_processed']:,} files")
         print(f"  Skipped: {stats['total_files_skipped']:,} files")
         print(f"  Errors: {stats['total_files_errors']:,} files")
 
-    def _print_type_breakdown(self, stats: Dict) -> None:
+    def _print_type_breakdown(self, stats: Dict[str, Any]) -> None:
         videos_processed = stats.get("total_videos_processed", 0)
         images_processed = stats.get("total_images_processed", 0)
         videos_skipped = stats.get("total_videos_skipped", 0)
@@ -504,7 +516,7 @@ class StatisticsManager:
         if images_processed > 0 or images_skipped > 0 or images_errors > 0:
             print(f"  Images: {images_processed:,} processed, {images_skipped:,} skipped, {images_errors:,} errors")
 
-    def _print_size_statistics(self, stats: Dict) -> None:
+    def _print_size_statistics(self, stats: Dict[str, Any]) -> None:
         print()
         print("Size Statistics:")
         original_size = stats["total_original_size_bytes"]
@@ -519,7 +531,7 @@ class StatisticsManager:
             compression_ratio = (space_saved / original_size) * 100
             print(f"  Overall Compression: {compression_ratio:.2f}%")
 
-    def _print_size_by_type(self, stats: Dict) -> None:
+    def _print_size_by_type(self, stats: Dict[str, Any]) -> None:
         videos_original = stats.get("total_videos_original_size_bytes", 0)
         videos_compressed = stats.get("total_videos_compressed_size_bytes", 0)
         videos_space_saved = stats.get("total_videos_space_saved_bytes", 0)
@@ -549,7 +561,7 @@ class StatisticsManager:
                 image_ratio = (images_space_saved / images_original) * 100
                 print(f"    Compression: {image_ratio:.2f}%")
 
-    def _print_format_breakdown(self, stats: Dict) -> None:
+    def _print_format_breakdown(self, stats: Dict[str, Any]) -> None:
         # Format-level breakdown (only show formats with count > 0)
         format_stats = stats.get("processed_file_format_stats", {})
         if not format_stats:
@@ -676,7 +688,7 @@ class StatisticsManager:
 
         print("\n" + "=" * 60)
 
-    def load_files_log(self) -> Dict[str, Dict]:  # noqa: C901
+    def load_files_log(self) -> Dict[str, Dict[str, Any]]:  # noqa: C901
         """
         Load complete file processing history from files.json.
 
@@ -688,7 +700,7 @@ class StatisticsManager:
 
         try:
             with open(self.files_log_file, "r", encoding="utf-8") as f:
-                files_log = json.load(f)
+                files_log = cast(Dict[str, Any] | List[Dict[str, Any]], json.load(f))
             # Handle both old format (list) and new format (dict)
             if isinstance(files_log, list):
                 # Convert old format (list) to new format (dict)
@@ -739,7 +751,12 @@ class StatisticsManager:
             return {}
 
     def append_to_files_log(  # noqa: C901
-        self, files_data: List[Dict], run_uuid: str, cmd_args: Dict, run_stats: Dict = None, command: str = None
+        self,
+        files_data: List[Dict[str, Any]],
+        run_uuid: str,
+        cmd_args: Dict[str, Any],
+        run_stats: Optional[Dict[str, Any]] = None,
+        command: Optional[str] = None,
     ) -> None:
         """
         Append files from current run to files.json.

@@ -423,7 +423,7 @@ class MediaCompressor:
 
         return in_path, out_path
 
-    def _identify_file(self, file_path: Path) -> (Optional[str], Optional[str]):
+    def _identify_file(self, file_path: Path) -> Tuple[Optional[str], Optional[str]]:
         suffix = file_path.suffix.lower()
         if suffix in self.video_exts:
             file_type = "video"
