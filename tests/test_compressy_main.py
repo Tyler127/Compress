@@ -824,3 +824,50 @@ class TestCompressyMain:
             with patch("compressy.py.StatisticsManager"):
                 result = compressy_main.main()
                 assert result == 0
+
+    @patch("compressy.py.MediaCompressor")
+    @patch("compressy.py.CompressionConfig")
+    @patch("compressy.py.LoggingConfig.load_from_file")
+    @patch("compressy.py.get_logger")
+    @patch("sys.argv")
+    def test_main_logging_initialization_exception(
+        self,
+        mock_argv,
+        mock_get_logger,
+        mock_load_from_file,
+        mock_config_class,
+        mock_compressor_class,
+        temp_dir,
+        capsys,
+    ):
+        """Test main() handles logging initialization exception gracefully."""
+        mock_argv.__getitem__.side_effect = lambda i: ["compressy.py", str(temp_dir)][i]
+
+        # Make LoggingConfig.load_from_file raise an exception
+        mock_load_from_file.side_effect = Exception("Config error")
+
+        # Create a test video file
+        video_file = temp_dir / "test.mp4"
+        video_file.write_bytes(b"0" * 1000)
+
+        mock_config = MagicMock()
+        mock_config_class.return_value = mock_config
+
+        mock_compressor = MagicMock()
+        mock_compressor.compress.return_value = {
+            "processed": 1,
+            "skipped": 0,
+            "errors": 0,
+            "total_original_size": 1000,
+            "total_compressed_size": 500,
+            "space_saved": 500,
+        }
+        mock_compressor_class.return_value = mock_compressor
+
+        with patch("compressy.py.ReportGenerator"):
+            with patch("compressy.py.StatisticsManager"):
+                result = compressy_main.main()
+                # Should continue despite logging error
+                assert result == 0
+                output = capsys.readouterr()
+                assert "Warning: Could not initialize logging" in output.out

@@ -3,10 +3,11 @@ import shlex
 import sys
 import uuid
 from pathlib import Path
-from compressy.core.config import CompressionConfig
+from compressy.core.config import CompressionConfig, LoggingConfig
 from compressy.core.media_compressor import MediaCompressor
 from compressy.services.reports import ReportGenerator
 from compressy.services.statistics import StatisticsManager
+from compressy.utils.logger import get_logger
 from compressy.utils.format import format_size, parse_size
 
 
@@ -126,6 +127,19 @@ def main():
         help="View run history and exit (optionally limit to N most recent runs, default: all)"
     )
     parser.add_argument(
+        "--log-level",
+        type=str,
+        default=None,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level (default: INFO, from config file)"
+    )
+    parser.add_argument(
+        "--log-dir",
+        type=str,
+        default=None,
+        help="Directory for log files (default: logs, from config file)"
+    )
+    parser.add_argument(
         "-m", "--min-size",
         type=str,
         default=None,
@@ -151,6 +165,41 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # Initialize logging early
+    try:
+        # Get script directory for config file location
+        script_dir = Path(__file__).resolve().parent
+        logging_config_path = script_dir / "compressy" / "logging_config.json"
+        
+        # Load logging config from file
+        logging_config = LoggingConfig.load_from_file(logging_config_path)
+        
+        # Merge with CLI arguments (CLI takes precedence)
+        logging_config = logging_config.merge_with_cli_args(
+            log_level=args.log_level,
+            log_dir=args.log_dir
+        )
+        
+        # Configure logger
+        logger = get_logger()
+        logger.configure(
+            log_level=logging_config.log_level,
+            log_dir=logging_config.log_dir,
+            enable_console=logging_config.enable_console,
+            enable_file=logging_config.enable_file,
+            rotation_enabled=logging_config.rotation_enabled,
+            rotation_type=logging_config.rotation_type,
+            max_bytes=logging_config.max_bytes,
+            backup_count=logging_config.backup_count,
+            when=logging_config.when
+        )
+        
+        logger.info("Compressy started")
+        logger.debug(f"Logging configured: level={logging_config.log_level}, dir={logging_config.log_dir}")
+    except Exception as e:
+        print(f"Warning: Could not initialize logging: {e}")
+        # Continue without logging rather than failing
     
     # Build command string from sys.argv for logging (only for compression runs, not view commands)
     def build_command_string():

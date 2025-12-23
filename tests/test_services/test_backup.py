@@ -88,3 +88,22 @@ class TestBackupManager:
             assert isinstance(backup_path, Path)
             assert backup_path.parent == backup_dir
             assert backup_path.name == source_folder.name or backup_path.name.startswith(source_folder.name + "_")
+
+    def test_create_backup_exception_handler(self, temp_dir):
+        """Test that create_backup handles exceptions and logs error."""
+        source_folder = temp_dir / "source"
+        source_folder.mkdir()
+        backup_dir = temp_dir / "backups"
+
+        with patch("compressy.services.backup.shutil.copytree", side_effect=OSError("Disk full")):
+            with patch("compressy.services.backup.get_logger") as mock_get_logger:
+                mock_logger = mock_get_logger.return_value
+
+                with pytest.raises(OSError, match="Disk full"):
+                    BackupManager.create_backup(source_folder, backup_dir)
+
+                # Should log error with exception info
+                mock_logger.error.assert_called_once()
+                call_args = mock_logger.error.call_args
+                assert "Failed to create backup" in str(call_args)
+                assert call_args[1]["exc_info"] is True

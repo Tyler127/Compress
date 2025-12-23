@@ -1,0 +1,14 @@
+{
+  "log_level": "INFO",
+  "log_dir": "logs",
+  "enable_console": true,
+  "enable_file": true,
+  "rotation": {
+    "enabled": false,
+    "type": "size",
+    "max_bytes": 10485760,
+    "backup_count": 5,
+    "when": "midnight"
+  }
+}
+

@@ -12,6 +12,7 @@ from compressy.services.backup import BackupManager
 from compressy.services.statistics import StatisticsTracker
 from compressy.utils.file_processor import FileProcessor
 from compressy.utils.format import format_size
+from compressy.utils.logger import get_logger
 
 
 # ============================================================================
@@ -36,10 +37,16 @@ class MediaCompressor:
         self.file_processor = FileProcessor()
         self.stats = StatisticsTracker(config.recursive)
         self.backup_manager = BackupManager() if config.backup_dir else None
+        self.logger = get_logger()
 
         # File extension lists
         self.video_exts = [".mp4", ".mov", ".mkv", ".avi", ".m4v", ".ts"]
         self.image_exts = [".jpg", ".jpeg", ".png", ".webp"]
+
+        self.logger.debug(
+            f"MediaCompressor initialized with config: video_crf={config.video_crf}, "
+            f"image_quality={config.image_quality}, recursive={config.recursive}"
+        )
 
     def compress(self) -> Dict:
         """
@@ -75,6 +82,7 @@ class MediaCompressor:
         all_files = self._collect_files(compressed_folder)
 
         if not all_files:
+            self.logger.info("No media files found to compress")
             print("No media files found to compress.")
             result = self.stats.get_stats()
             if not self.config.recursive:
@@ -83,10 +91,12 @@ class MediaCompressor:
 
         if not self.config.overwrite:
             compressed_folder.mkdir(parents=True, exist_ok=True)
+            self.logger.debug(f"Created compressed folder: {compressed_folder}")
 
         total_files_count = len(all_files)
         # Set total_files once - this represents all files found upfront
         self.stats.stats["total_files"] = total_files_count
+        self.logger.info(f"Found {total_files_count} media file(s) to process")
         print(f"Found {total_files_count} media file(s) to process...")
 
         # Process each file
@@ -474,6 +484,7 @@ class MediaCompressor:
         )
         self.stats.add_file_info(file_info, folder_key)
 
+        self.logger.debug(f"Skipping already compressed file: {file_path.name}")
         print(
             f"[{idx}/{total_files}] Already compressed: {file_path.name} "
             f"({format_size(original_size)} → {format_size(existing_size)}, {compression_ratio:.1f}% reduction)"
@@ -503,6 +514,10 @@ class MediaCompressor:
             return False
 
         if self.config.keep_if_larger:
+            self.logger.warning(
+                f"Compressed file is larger than original: {in_path.name} "
+                f"({format_size(compressed_size)} > {format_size(original_size)})"
+            )
             message = "  ⚠️  Warning: Compressed file is larger than original"
             message += f" ({format_size(compressed_size)} > {format_size(original_size)})"
             print(message)
@@ -540,6 +555,7 @@ class MediaCompressor:
                 self.file_processor.preserve_timestamps(in_path, out_path)
             else:
                 shutil.copy(in_path, out_path)
+            self.logger.info(f"Compressed file larger, copied original instead: {in_path.name}")
             print(f"  ⚠️  Compressed file larger, copying original instead: {format_size(original_size)}")
 
             file_info = self._build_file_info(
@@ -556,6 +572,7 @@ class MediaCompressor:
             self.stats.add_file_info(file_info, folder_key)
             self.stats.update_stats(original_size, original_size, 0, "processed", folder_key, file_type, file_extension)
         else:
+            self.logger.info(f"Compressed file larger, skipping: {in_path.name}")
             message = "  ⚠️  Compressed file is larger"
             message += f" ({format_size(compressed_size)} > {format_size(original_size)}), skipping..."
             print(message)
@@ -597,11 +614,15 @@ class MediaCompressor:
             self.file_processor.handle_overwrite(in_path, out_path)
 
         if compression_ratio < 0:
+            self.logger.warning(
+                f"Compression increased file size: {file_path.name} ({compression_ratio:.1f}% increase)"
+            )
             print(
                 f"  ⚠️  Compressed (larger): {format_size(original_size)} → {format_size(compressed_size)} "
                 f"({compression_ratio:.1f}% increase)"
             )
         else:
+            self.logger.info(f"Successfully compressed: {file_path.name} ({compression_ratio:.1f}% reduction)")
             print(
                 f"  ✓ Compressed: {format_size(original_size)} → {format_size(compressed_size)} "
                 f"({compression_ratio:.1f}% reduction)"
@@ -643,6 +664,11 @@ class MediaCompressor:
         file_extension: Optional[str],
         file_start_time: float,
     ) -> None:
+        self.logger.error(
+            f"FFmpeg error processing file: {in_path.name}",
+            exc_info=True,
+            extra={"file_path": str(in_path), "return_code": error.returncode},
+        )
         print(f"  ✗ Error processing {in_path}: FFmpeg error")
         self._record_failure(
             error,
@@ -667,6 +693,11 @@ class MediaCompressor:
         file_extension: Optional[str],
         file_start_time: float,
     ) -> None:
+        self.logger.error(
+            f"Error processing file: {in_path.name}",
+            exc_info=True,
+            extra={"file_path": str(in_path), "error_type": type(error).__name__},
+        )
         print(f"  ✗ Error processing {in_path}: {error}")
         self._record_failure(
             error,

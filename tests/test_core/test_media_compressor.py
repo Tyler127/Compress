@@ -234,8 +234,8 @@ class TestMediaCompressor:
             output_file.write_bytes(b"0" * 500)  # 500 bytes (compressed)
 
             # Store original methods to avoid recursion
-            original_exists = Path.exists
             original_stat = Path.stat
+            original_exists = Path.exists
 
             # Mock stat to return sizes - use os.stat_result for proper attribute access
             # Compare paths as strings to handle Path object differences
@@ -328,8 +328,8 @@ class TestMediaCompressor:
             output_file.write_bytes(b"0" * 500)
 
             # Store original methods to avoid recursion
-            original_exists = Path.exists
             original_stat = Path.stat
+            original_exists = Path.exists
 
             def mock_stat(self, **kwargs):
                 """Mock Path.stat() as an instance method."""

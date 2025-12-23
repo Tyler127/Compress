@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from compressy.utils.logger import get_logger
+
 
 # ============================================================================
 # Report Generator
@@ -21,6 +23,8 @@ class ReportGenerator:
             output_dir: Directory where reports will be saved
         """
         self.output_dir = output_dir
+        self.logger = get_logger()
+        self.logger.debug(f"ReportGenerator initialized with output_dir: {output_dir}")
 
     def generate(
         self,
@@ -86,6 +90,7 @@ class ReportGenerator:
                     run_uuid,
                 )
                 report_paths.append(unique_path)
+                self.logger.info(f"Report generated: {unique_path}")
                 print(f"✓ Report generated: {unique_path}")
 
             # Generate aggregated report combining all subfolder reports
@@ -124,6 +129,7 @@ class ReportGenerator:
                 run_uuid,
             )
             report_paths.append(unique_aggregated_path)
+            self.logger.info(f"Aggregated report generated: {unique_aggregated_path}")
             print(f"✓ Aggregated report generated: {unique_aggregated_path}")
 
         else:
@@ -133,6 +139,7 @@ class ReportGenerator:
             unique_path = self._get_unique_path(report_path)
             self._write_json_report(unique_path, stats, compressed_folder_name, None, cmd_args, run_uuid)
             report_paths.append(unique_path)
+            self.logger.info(f"Report generated: {unique_path}")
             print(f"\n✓ Report generated: {unique_path}")
 
         return report_paths
